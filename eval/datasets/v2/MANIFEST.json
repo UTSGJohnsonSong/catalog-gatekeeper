@@ -1,0 +1,38 @@
+{
+ "files": {
+  "audit_dev.jsonl": {
+   "rows": 468,
+   "sha256": "a56a4df57bbe279d5506646cb77f2ab0ee390e6e5e69403384e282b2abdd3706"
+  },
+  "audit_test.jsonl": {
+   "rows": 468,
+   "sha256": "22d60d9cd48bb40d3cbc62f7fd5af9e6028edaf2d37d350057ccb0879a42ba1b"
+  },
+  "citations_dev.jsonl": {
+   "rows": 76,
+   "sha256": "1192b83c9471828398cac84dd24b523db50e73ea5ebc41c0d4a124ea314f1527"
+  },
+  "citations_test.jsonl": {
+   "rows": 82,
+   "sha256": "b64f1c1f5420dd56b3fc1c1173c5169108bd1ade9edfc71e4f5bb5a1e9444c11"
+  },
+  "policy_qa_dev.jsonl": {
+   "rows": 37,
+   "sha256": "7d263eec691c3901d7207cdf19be30d407541cbde0a4b4e0aa0805bc264da34b"
+  },
+  "policy_qa_test.jsonl": {
+   "rows": 33,
+   "sha256": "dc8d5e96770c01b85cc74f3dfd9d6d49ab065ed54c97a59763e8a9ad40a9a62e"
+  },
+  "proposals_dev.jsonl": {
+   "rows": 387,
+   "sha256": "20dc7a82f773f2aca9965472bba315c37a5062b56f1c8d0f86f3e9d4b006aadb"
+  },
+  "proposals_test.jsonl": {
+   "rows": 387,
+   "sha256": "4845b1e8ded6c5da97f17fcb4a48b6212b10e9111ce608017003a9bf8ceb002b"
+  }
+ },
+ "generator_sha256": "04b6c5221541ef058cd12ab4f9e9d5ac8920c210a556c68d88350b411b6ed805",
+ "seed": 2026
+}
