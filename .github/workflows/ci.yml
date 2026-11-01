@@ -1,0 +1,145 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  PGPASSWORD_FOR_TESTS: local-demo-owner
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: gatekeeper
+          POSTGRES_PASSWORD: local-demo-owner
+          POSTGRES_DB: gatekeeper
+        ports: ["54329:5432"]
+        options: >-
+          --health-cmd "pg_isready -U gatekeeper" --health-interval 2s --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - run: ruff check src tests scripts
+      - run: ruff format --check src tests scripts
+      - run: mypy
+      - name: Tests (real Postgres and pgvector, no database mocks)
+        run: pytest tests --cov --cov-report=term --cov-fail-under=80
+
+  eval-gate:
+    runs-on: ubuntu-24.04
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: gatekeeper
+          POSTGRES_PASSWORD: local-demo-owner
+          POSTGRES_DB: gatekeeper
+        ports: ["54329:5432"]
+        options: >-
+          --health-cmd "pg_isready -U gatekeeper" --health-interval 2s --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - name: The test split must be byte-identical to the frozen one
+        run: python -m gatekeeper_eval check-frozen
+      - name: Rule and retrieval gates, dev split
+        run: python -m gatekeeper_eval all --split dev
+      - name: Rule and retrieval gates, test split (aggregates only)
+        run: python -m gatekeeper_eval all --split test
+      - name: Agent accuracy needs a real model, so it reports SKIPPED without a key
+        run: python -m gatekeeper_eval agent --split dev
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: eval-reports
+          path: eval/reports/
+
+  frontend:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  api-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - run: pip install -e .
+      - run: python scripts/export_openapi.py
+      - run: npm ci && npm run gen:api
+        working-directory: frontend
+      - name: Fail if the UI's generated API types drifted from the backend
+        run: git diff --exit-code frontend/openapi.json frontend/src/api/schema.d.ts
+
+  demo-smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .
+      - run: docker compose up -d --wait --build
+      - run: python scripts/smoke.py
+      - if: failure()
+        run: docker compose logs --tail 100
+
+  terraform:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+      - run: terraform fmt -check -recursive
+      - name: Validate only. This pipeline never plans against an account or applies.
+        run: terraform init -backend=false && terraform validate
+
+  security:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+      - run: pip install pip-audit && pip-audit -r requirements.lock
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - run: npm audit --omit=dev
+        working-directory: frontend

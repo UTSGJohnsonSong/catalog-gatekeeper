@@ -1,0 +1,45 @@
+{
+ "agent_metrics": null,
+ "applied": 14,
+ "blocked_approval_attempts_refused": 3,
+ "catalog_size": 40,
+ "command": "python -m gatekeeper_eval all --split dev",
+ "dataset_test_sha256": "f3f0f6c7307b75d09b24adfe1c9113d53dfef622805312a2f4c79cc67fd4eb0f",
+ "fixable_findings_after": 3,
+ "fixable_findings_before": 17,
+ "frozen_test_split_intact": false,
+ "gate": "PASS",
+ "gate_failures": [],
+ "git_sha": "unknown",
+ "invariants": {
+  "every_applied_matches_approved_hash": true,
+  "every_applied_verified_in_store": true,
+  "every_run_finished": true,
+  "no_blocked_reached_approval": true
+ },
+ "limits": [
+  "All data is synthetic. Labels are true by construction, and defect rates here are not real-world prevalence.",
+  "The same engineer wrote the rules and the datasets, so independence is procedural, not absolute.",
+  "With about 30 positives per rule, per-rule intervals are wide.",
+  "These numbers measure rules against their specification, not against real merchants or a real LLM."
+ ],
+ "measures": "plumbing only; not model accuracy. The model is a deterministic template script.",
+ "model": "heuristic-v1",
+ "products_with_fixable_findings": 17,
+ "proposal_statuses": {
+  "blocked": 3,
+  "pending_review": 14
+ },
+ "provider": "heuristic",
+ "ran_at_utc": "20261101T005427Z",
+ "seconds_per_product_no_model": {
+  "p50": 0.04216769999766257,
+  "p95": 0.05279220000375062
+ },
+ "split": "fixture",
+ "suite": "e2e",
+ "template_citations": {
+  "total": 9,
+  "verified": 8
+ }
+}

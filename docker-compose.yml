@@ -1,0 +1,84 @@
+# `docker compose up` gives a working demo with no keys and no accounts: a simulated store and a template
+# model (not an LLM). Credentials below are local demo values, not secrets. Do not reuse them anywhere else.
+x-app: &app
+  build: .
+  image: catalog-gatekeeper:local
+  environment: &app-env
+    ENV: development
+    DATABASE_URL: postgresql://gatekeeper_app:local-demo-app@db:5432/gatekeeper
+    DEMO_MODE: "1"
+    WRITEBACK_ENABLED: "1"
+    SHOPIFY_ADAPTER: fixture
+    SHOPIFY_SHOP_DOMAIN: demo-store.myshopify.com
+    SHOPIFY_WEBHOOK_SECRET: local-demo-webhook-secret
+    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    LLM_PROVIDER: ${LLM_PROVIDER:-auto}
+    FIXTURES_DIR: /app/fixtures
+    STATIC_DIR: /app/static
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: gatekeeper
+      POSTGRES_PASSWORD: local-demo-owner
+      POSTGRES_DB: gatekeeper
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gatekeeper -d gatekeeper"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    <<: *app
+    command: ["python", "-m", "gatekeeper.seed"]
+    environment:
+      <<: *app-env
+      DATABASE_URL: postgresql://gatekeeper:local-demo-owner@db:5432/gatekeeper
+      APP_DB_PASSWORD: local-demo-app
+      MCP_DB_PASSWORD: local-demo-mcp
+      DEMO_AUTORUN: "16"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *app
+    command: ["uvicorn", "gatekeeper.api.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/readyz', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  worker:
+    <<: *app
+    command: ["python", "-m", "gatekeeper.worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  mcp:
+    <<: *app
+    command: ["python", "-m", "gatekeeper_mcp", "--http", "--host", "0.0.0.0", "--port", "8808"]
+    environment:
+      MCP_DATABASE_URL: postgresql://gatekeeper_mcp_ro:local-demo-mcp@db:5432/gatekeeper
+    ports:
+      - "127.0.0.1:8808:8808"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:

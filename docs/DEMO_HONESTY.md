@@ -1,0 +1,20 @@
+# What is real and what is simulated
+
+| Part | State | How it is labelled |
+|---|---|---|
+| Store | Simulated by `FixtureShopify` in a Postgres schema | Banner: "The store is simulated." |
+| Model | `heuristic-v1`, a template script that speaks the tool protocol. It is not an LLM | Banner, proposal page, `agent_runs.mode = 'demo'`, `model` field in the API and MCP output |
+| Judge | Not run in demo mode, because a template cannot assess anything | No judge rows, `judge_status: disabled` |
+| Embeddings | Hashed TF-IDF. Lexical matching, no semantic understanding | `embedder_id` in every retrieval report |
+| Sign-in | Demo tokens exist only with `DEMO_MODE=1` and no configured tokens. Production refuses to boot with demo mode on | Banner: "Demo sign-in is on." |
+
+Rules that keep this honest:
+
+1. `agent_runs.model` holds what actually ran. The demo never records the hosted LLM's model id.
+2. Eval reports carry `agent_metrics: null` unless a real model ran. A test fails if a plumbing report carries agent metrics.
+3. The agent gate prints `SKIPPED` without a key, never `PASS`.
+4. Tests marked `pipeline_plumbing` exercise control flow with scripted models, and say that they do not measure model accuracy.
+
+## The fixture is stricter than Shopify in one way
+
+`FixtureShopify.update_product` enforces `expected_content_hash` atomically. Shopify's `productUpdate` documents no such precondition, so `LiveShopify` ignores that argument. The race test proves the service handles a stale rejection. It does not prove the live adapter closes the race. See `docs/adr/0006-shopify-port.md`.

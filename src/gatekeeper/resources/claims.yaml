@@ -1,0 +1,34 @@
+# Hard-claim lexicon for validator V06. A phrase blocks only when it is new, i.e. the current product
+# text does not already contain it. Matched on word boundaries after text normalization.
+medical:
+  - cure
+  - cures
+  - treats
+  - heal
+  - heals
+  - clinically proven
+  - fda approved
+  - fda
+  - prevents disease
+  - doctor recommended
+comparative:
+  - better than
+  - unlike other
+  - beats the competition
+  - allbirds
+  - patagonia
+  - yeti
+  - stanley
+absolute:
+  - "#1"
+  - number one
+  - best in the world
+  - world's best
+  - 100% safe
+  - guaranteed to last forever
+  - never breaks
+price_promise:
+  - lowest price
+  - price match
+  - cheapest
+  - best price

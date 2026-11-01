@@ -1,0 +1,1437 @@
+{
+ "components": {
+  "schemas": {
+   "ApproveRequest": {
+    "properties": {
+     "confirm_high_risk": {
+      "default": false,
+      "title": "Confirm High Risk",
+      "type": "boolean"
+     },
+     "review_hash": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Review Hash",
+      "type": "string"
+     }
+    },
+    "required": [
+     "review_hash"
+    ],
+    "title": "ApproveRequest",
+    "type": "object"
+   },
+   "AuditEntry": {
+    "properties": {
+     "action": {
+      "title": "Action",
+      "type": "string"
+     },
+     "actor": {
+      "title": "Actor",
+      "type": "string"
+     },
+     "at": {
+      "format": "date-time",
+      "title": "At",
+      "type": "string"
+     },
+     "detail": {
+      "additionalProperties": true,
+      "title": "Detail",
+      "type": "object"
+     },
+     "entity_id": {
+      "title": "Entity Id",
+      "type": "string"
+     },
+     "entity_type": {
+      "title": "Entity Type",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "id",
+     "at",
+     "actor",
+     "action",
+     "entity_type",
+     "entity_id",
+     "detail"
+    ],
+    "title": "AuditEntry",
+    "type": "object"
+   },
+   "Citation": {
+    "properties": {
+     "chunk_id": {
+      "title": "Chunk Id",
+      "type": "string"
+     },
+     "chunk_text": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Chunk Text"
+     },
+     "doc_id": {
+      "title": "Doc Id",
+      "type": "string"
+     },
+     "quote": {
+      "title": "Quote",
+      "type": "string"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "verified": {
+      "title": "Verified",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "doc_id",
+     "chunk_id",
+     "quote",
+     "verified"
+    ],
+    "title": "Citation",
+    "type": "object"
+   },
+   "DecisionResult": {
+    "properties": {
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "status"
+    ],
+    "title": "DecisionResult",
+    "type": "object"
+   },
+   "FieldDiff": {
+    "properties": {
+     "after": {
+      "title": "After",
+      "type": "string"
+     },
+     "before": {
+      "title": "Before",
+      "type": "string"
+     },
+     "field": {
+      "title": "Field",
+      "type": "string"
+     }
+    },
+    "required": [
+     "field",
+     "before",
+     "after"
+    ],
+    "title": "FieldDiff",
+    "type": "object"
+   },
+   "FindingOut": {
+    "properties": {
+     "evidence": {
+      "additionalProperties": true,
+      "title": "Evidence",
+      "type": "object"
+     },
+     "fields": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Fields",
+      "type": "array"
+     },
+     "fixable": {
+      "title": "Fixable",
+      "type": "boolean"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "rule_id": {
+      "title": "Rule Id",
+      "type": "string"
+     },
+     "severity": {
+      "title": "Severity",
+      "type": "string"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "subject": {
+      "title": "Subject",
+      "type": "string"
+     }
+    },
+    "required": [
+     "rule_id",
+     "name",
+     "severity",
+     "fixable",
+     "subject",
+     "fields",
+     "evidence",
+     "status"
+    ],
+    "title": "FindingOut",
+    "type": "object"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "title": "Detail",
+      "type": "array"
+     }
+    },
+    "title": "HTTPValidationError",
+    "type": "object"
+   },
+   "Meta": {
+    "properties": {
+     "demo_mode": {
+      "title": "Demo Mode",
+      "type": "boolean"
+     },
+     "judge": {
+      "title": "Judge",
+      "type": "string"
+     },
+     "model": {
+      "title": "Model",
+      "type": "string"
+     },
+     "model_mode": {
+      "title": "Model Mode",
+      "type": "string"
+     },
+     "provider": {
+      "title": "Provider",
+      "type": "string"
+     },
+     "shopify_adapter": {
+      "title": "Shopify Adapter",
+      "type": "string"
+     },
+     "writeback_env_enabled": {
+      "title": "Writeback Env Enabled",
+      "type": "boolean"
+     },
+     "writeback_shop_enabled": {
+      "title": "Writeback Shop Enabled",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "demo_mode",
+     "model_mode",
+     "model",
+     "provider",
+     "shopify_adapter",
+     "judge",
+     "writeback_env_enabled",
+     "writeback_shop_enabled"
+    ],
+    "title": "Meta",
+    "type": "object"
+   },
+   "ProductOut": {
+    "properties": {
+     "content_hash": {
+      "title": "Content Hash",
+      "type": "string"
+     },
+     "gid": {
+      "title": "Gid",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "open_findings": {
+      "title": "Open Findings",
+      "type": "integer"
+     },
+     "open_rules": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Open Rules",
+      "type": "array"
+     },
+     "product_type": {
+      "title": "Product Type",
+      "type": "string"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     },
+     "vendor": {
+      "title": "Vendor",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "gid",
+     "title",
+     "status",
+     "product_type",
+     "vendor",
+     "content_hash",
+     "open_findings",
+     "open_rules"
+    ],
+    "title": "ProductOut",
+    "type": "object"
+   },
+   "ProposalDetail": {
+    "properties": {
+     "applied_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Applied At"
+     },
+     "base_content_hash": {
+      "title": "Base Content Hash",
+      "type": "string"
+     },
+     "citations": {
+      "items": {
+       "$ref": "#/components/schemas/Citation"
+      },
+      "title": "Citations",
+      "type": "array"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "decided_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Decided At"
+     },
+     "diffs": {
+      "items": {
+       "$ref": "#/components/schemas/FieldDiff"
+      },
+      "title": "Diffs",
+      "type": "array"
+     },
+     "findings": {
+      "items": {
+       "$ref": "#/components/schemas/FindingOut"
+      },
+      "title": "Findings",
+      "type": "array"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "judge_status": {
+      "title": "Judge Status",
+      "type": "string"
+     },
+     "model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model"
+     },
+     "model_mode": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model Mode"
+     },
+     "product_gid": {
+      "title": "Product Gid",
+      "type": "string"
+     },
+     "product_id": {
+      "title": "Product Id",
+      "type": "integer"
+     },
+     "product_title": {
+      "title": "Product Title",
+      "type": "string"
+     },
+     "provider": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Provider"
+     },
+     "rationale": {
+      "title": "Rationale",
+      "type": "string"
+     },
+     "review_hash": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Review Hash"
+     },
+     "risk_reasons": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Risk Reasons",
+      "type": "array"
+     },
+     "risk_score": {
+      "title": "Risk Score",
+      "type": "integer"
+     },
+     "run_flags": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Run Flags",
+      "type": "array"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "validation": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationRow"
+      },
+      "title": "Validation",
+      "type": "array"
+     },
+     "writeback_status": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Writeback Status"
+     }
+    },
+    "required": [
+     "id",
+     "status",
+     "risk_score",
+     "risk_reasons",
+     "rationale",
+     "product_id",
+     "product_title",
+     "product_gid",
+     "base_content_hash",
+     "diffs",
+     "validation",
+     "citations",
+     "findings",
+     "review_hash",
+     "model_mode",
+     "model",
+     "provider",
+     "run_flags",
+     "created_at",
+     "decided_at",
+     "applied_at",
+     "writeback_status",
+     "judge_status"
+    ],
+    "title": "ProposalDetail",
+    "type": "object"
+   },
+   "Queue": {
+    "properties": {
+     "counts": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Counts",
+      "type": "object"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/QueueItem"
+      },
+      "title": "Items",
+      "type": "array"
+     }
+    },
+    "required": [
+     "items",
+     "counts"
+    ],
+    "title": "Queue",
+    "type": "object"
+   },
+   "QueueItem": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "failed_rules": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Failed Rules",
+      "type": "array"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model"
+     },
+     "model_mode": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model Mode"
+     },
+     "open_findings": {
+      "title": "Open Findings",
+      "type": "integer"
+     },
+     "product_id": {
+      "title": "Product Id",
+      "type": "integer"
+     },
+     "risk_score": {
+      "title": "Risk Score",
+      "type": "integer"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "product_id",
+     "title",
+     "status",
+     "risk_score",
+     "failed_rules",
+     "open_findings",
+     "model_mode",
+     "model",
+     "created_at"
+    ],
+    "title": "QueueItem",
+    "type": "object"
+   },
+   "RejectRequest": {
+    "properties": {
+     "note": {
+      "maxLength": 1000,
+      "minLength": 5,
+      "title": "Note",
+      "type": "string"
+     }
+    },
+    "required": [
+     "note"
+    ],
+    "title": "RejectRequest",
+    "type": "object"
+   },
+   "RunRequest": {
+    "properties": {
+     "limit": {
+      "default": 10,
+      "maximum": 50.0,
+      "minimum": 1.0,
+      "title": "Limit",
+      "type": "integer"
+     },
+     "product_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Product Id"
+     }
+    },
+    "title": "RunRequest",
+    "type": "object"
+   },
+   "SimulateEditRequest": {
+    "properties": {
+     "description_html": {
+      "default": "<p>Edited by the merchant in the Shopify admin while the fix was waiting for review.</p>",
+      "title": "Description Html",
+      "type": "string"
+     },
+     "product_id": {
+      "title": "Product Id",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "product_id"
+    ],
+    "title": "SimulateEditRequest",
+    "type": "object"
+   },
+   "ValidationError": {
+    "properties": {
+     "ctx": {
+      "title": "Context",
+      "type": "object"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "title": "Location",
+      "type": "array"
+     },
+     "msg": {
+      "title": "Message",
+      "type": "string"
+     },
+     "type": {
+      "title": "Error Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError",
+    "type": "object"
+   },
+   "ValidationRow": {
+    "properties": {
+     "evidence": {
+      "additionalProperties": true,
+      "title": "Evidence",
+      "type": "object"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "passed": {
+      "title": "Passed",
+      "type": "boolean"
+     },
+     "rule_id": {
+      "title": "Rule Id",
+      "type": "string"
+     },
+     "severity": {
+      "title": "Severity",
+      "type": "string"
+     }
+    },
+    "required": [
+     "rule_id",
+     "name",
+     "kind",
+     "severity",
+     "passed",
+     "evidence"
+    ],
+    "title": "ValidationRow",
+    "type": "object"
+   },
+   "Whoami": {
+    "properties": {
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "role": {
+      "title": "Role",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "role"
+    ],
+    "title": "Whoami",
+    "type": "object"
+   },
+   "WritebackRequest": {
+    "properties": {
+     "enabled": {
+      "title": "Enabled",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "enabled"
+    ],
+    "title": "WritebackRequest",
+    "type": "object"
+   }
+  },
+  "securitySchemes": {
+   "HTTPBearer": {
+    "scheme": "bearer",
+    "type": "http"
+   }
+  }
+ },
+ "info": {
+  "title": "Catalog Gatekeeper",
+  "version": "0.1.0"
+ },
+ "openapi": "3.1.0",
+ "paths": {
+  "/api/admin/runs": {
+   "post": {
+    "operationId": "admin_runs_api_admin_runs_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RunRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "202": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": {
+          "type": "integer"
+         },
+         "title": "Response Admin Runs Api Admin Runs Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Admin Runs",
+    "tags": [
+     "admin"
+    ]
+   }
+  },
+  "/api/admin/sync": {
+   "post": {
+    "operationId": "admin_sync_api_admin_sync_post",
+    "responses": {
+     "202": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": {
+          "type": "string"
+         },
+         "title": "Response Admin Sync Api Admin Sync Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Admin Sync",
+    "tags": [
+     "admin"
+    ]
+   }
+  },
+  "/api/admin/writeback": {
+   "post": {
+    "operationId": "admin_writeback_api_admin_writeback_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/WritebackRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": {
+          "type": "boolean"
+         },
+         "title": "Response Admin Writeback Api Admin Writeback Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Admin Writeback",
+    "tags": [
+     "admin"
+    ]
+   }
+  },
+  "/api/audit-log": {
+   "get": {
+    "operationId": "audit_log_api_audit_log_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/AuditEntry"
+         },
+         "title": "Response Audit Log Api Audit Log Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Audit Log",
+    "tags": [
+     "admin"
+    ]
+   }
+  },
+  "/api/meta": {
+   "get": {
+    "operationId": "meta_api_meta_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Meta"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Meta",
+    "tags": [
+     "meta"
+    ]
+   }
+  },
+  "/api/products": {
+   "get": {
+    "operationId": "products_api_products_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 200,
+       "maximum": 500,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ProductOut"
+         },
+         "title": "Response Products Api Products Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Products",
+    "tags": [
+     "catalog"
+    ]
+   }
+  },
+  "/api/proposals/{proposal_id}": {
+   "get": {
+    "operationId": "proposal_api_proposals__proposal_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "proposal_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Proposal Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProposalDetail"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Proposal",
+    "tags": [
+     "review"
+    ]
+   }
+  },
+  "/api/proposals/{proposal_id}/approve": {
+   "post": {
+    "operationId": "approve_api_proposals__proposal_id__approve_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "proposal_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Proposal Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ApproveRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DecisionResult"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Approve",
+    "tags": [
+     "review"
+    ]
+   }
+  },
+  "/api/proposals/{proposal_id}/reject": {
+   "post": {
+    "operationId": "reject_api_proposals__proposal_id__reject_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "proposal_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Proposal Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RejectRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DecisionResult"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Reject",
+    "tags": [
+     "review"
+    ]
+   }
+  },
+  "/api/queue": {
+   "get": {
+    "operationId": "queue_api_queue_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 100,
+       "maximum": 200,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Queue"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Queue",
+    "tags": [
+     "review"
+    ]
+   }
+  },
+  "/api/whoami": {
+   "get": {
+    "operationId": "whoami_api_whoami_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Whoami"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Whoami",
+    "tags": [
+     "meta"
+    ]
+   }
+  },
+  "/demo/simulate-edit": {
+   "post": {
+    "description": "Simulates a merchant edit, then sends a signed webhook through the real verification path.",
+    "operationId": "simulate_edit_demo_simulate_edit_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SimulateEditRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": {
+          "type": "string"
+         },
+         "title": "Response Simulate Edit Demo Simulate Edit Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Simulate Edit",
+    "tags": [
+     "demo"
+    ]
+   }
+  },
+  "/healthz": {
+   "get": {
+    "operationId": "healthz_healthz_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": {
+          "type": "string"
+         },
+         "title": "Response Healthz Healthz Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Healthz",
+    "tags": [
+     "health"
+    ]
+   }
+  },
+  "/readyz": {
+   "get": {
+    "operationId": "readyz_readyz_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Readyz Readyz Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Readyz",
+    "tags": [
+     "health"
+    ]
+   }
+  },
+  "/webhooks/shopify": {
+   "post": {
+    "operationId": "webhook_webhooks_shopify_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Webhook",
+    "tags": [
+     "webhooks"
+    ]
+   }
+  }
+ }
+}

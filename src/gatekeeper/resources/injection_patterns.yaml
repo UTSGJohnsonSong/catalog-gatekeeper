@@ -1,0 +1,17 @@
+# Case-insensitive regexes after text normalization. Written for A13 and V11. They catch known phrasing,
+# which is one layer only. The structural defense is the narrow tool surface plus validators plus a human.
+patterns:
+  - 'ignore (all |any |the )?(previous|prior|above|earlier) (instructions|prompts|rules|directions)'
+  - 'disregard (all |any |the )?(previous|prior|above|earlier|your) (instructions|prompts|rules|directions)'
+  - 'forget (all |any |the )?(previous|prior|above|earlier|your) (instructions|prompts|rules)'
+  - 'override (the |your )?(system|safety|previous) (prompt|instructions|rules)'
+  - 'you are now (a|an|in) '
+  - 'new instructions?:'
+  - 'system prompt'
+  - 'developer mode'
+  - 'jailbreak'
+  - '(approve|auto-?approve) (this|the) (proposal|change|fix) (immediately|automatically|without)'
+  - '(reveal|print|show|leak) (your|the) (prompt|instructions|api key|secret)'
+  - 'do not tell the (user|reviewer|human)'
+  - 'attention (ai|assistant|agent|llm|model)\b'
+  - '(ai|llm) (agent|assistant|model)s? (must|should|shall) '

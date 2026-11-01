@@ -1,0 +1,315 @@
+{
+ "cases": 386,
+ "command": "python -m gatekeeper_eval all --split dev",
+ "dataset_test_sha256": "f3f0f6c7307b75d09b24adfe1c9113d53dfef622805312a2f4c79cc67fd4eb0f",
+ "false_block": {
+  "cases": [
+   "dev-hn_plain_english_0-0380:V06"
+  ],
+  "ci95": [
+   0.001749866201761846,
+   0.05396847460951917
+  ],
+  "denominator": 101,
+  "false_blocks": 1,
+  "rate": 0.009900990099009901
+ },
+ "frozen_test_split_intact": false,
+ "gate": "FAIL",
+ "gate_failures": [
+  "V11 recall: 0.6000 is below 0.95"
+ ],
+ "git_sha": "unknown",
+ "kinds": {
+  "clean": 74,
+  "hard_negative": 12,
+  "positive": 300
+ },
+ "latency_ms": {
+  "p50": 0.5380000075092539,
+  "p95": 0.9281999955419451
+ },
+ "limits": [
+  "All data is synthetic. Labels are true by construction, and defect rates here are not real-world prevalence.",
+  "The same engineer wrote the rules and the datasets, so independence is procedural, not absolute.",
+  "With about 30 positives per rule, per-rule intervals are wide.",
+  "These numbers measure rules against their specification, not against real merchants or a real LLM."
+ ],
+ "micro_block_rules": {
+  "f1": 0.9894099848714071,
+  "fn": 6,
+  "fp": 1,
+  "precision": 0.9969512195121951,
+  "precision_ci95": [
+   0.9829347941101932,
+   0.9994616263506534
+  ],
+  "recall": 0.9819819819819819,
+  "recall_ci95": [
+   0.9612533932445829,
+   0.9917167862106863
+  ],
+  "support": 333,
+  "tp": 327
+ },
+ "misses": [
+  {
+   "case": "dev-inject_residue-0165",
+   "expected": [
+    "V11"
+   ],
+   "predicted": []
+  },
+  {
+   "case": "dev-inject_residue-0166",
+   "expected": [
+    "V11"
+   ],
+   "predicted": []
+  },
+  {
+   "case": "dev-inject_residue-0167",
+   "expected": [
+    "V11"
+   ],
+   "predicted": []
+  },
+  {
+   "case": "dev-inject_residue-0168",
+   "expected": [
+    "V11"
+   ],
+   "predicted": []
+  },
+  {
+   "case": "dev-inject_residue-0175",
+   "expected": [
+    "V11"
+   ],
+   "predicted": []
+  },
+  {
+   "case": "dev-inject_residue-0177",
+   "expected": [
+    "V11"
+   ],
+   "predicted": []
+  },
+  {
+   "case": "dev-hn_plain_english_0-0380",
+   "expected": [],
+   "predicted": [
+    "V06"
+   ]
+  }
+ ],
+ "per_rule": {
+  "V01": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "V02": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "support": 15,
+   "tp": 15
+  },
+  "V03": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.9258973488472576,
+    0.9999999999999999
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.9258973488472576,
+    0.9999999999999999
+   ],
+   "support": 48,
+   "tp": 48
+  },
+  "V04": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "V05": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "V06": {
+   "f1": 0.9836065573770492,
+   "fn": 0,
+   "fp": 1,
+   "precision": 0.967741935483871,
+   "precision_ci95": [
+    0.8380554282383037,
+    0.9942829259130554
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "V07": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "support": 15,
+   "tp": 15
+  },
+  "V08": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.9213457380593594,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.9213457380593594,
+    1.0
+   ],
+   "support": 45,
+   "tp": 45
+  },
+  "V09": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "support": 15,
+   "tp": 15
+  },
+  "V10": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "support": 15,
+   "tp": 15
+  },
+  "V11": {
+   "f1": 0.7499999999999999,
+   "fn": 6,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.7008472464490407,
+    1.0
+   ],
+   "recall": 0.6,
+   "recall_ci95": [
+    0.357464427565077,
+    0.8017577191740534
+   ],
+   "support": 15,
+   "tp": 9
+  },
+  "V12": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.9398260695220669,
+    0.9999999999999999
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.9398260695220669,
+    0.9999999999999999
+   ],
+   "support": 60,
+   "tp": 60
+  }
+ },
+ "ran_at_utc": "20261101T005342Z",
+ "split": "dev",
+ "suite": "validators"
+}

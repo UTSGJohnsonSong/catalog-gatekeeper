@@ -1,0 +1,19 @@
+# Thresholds were set on 2026-10-31 before the first run of any suite. Changing one needs a dated note in
+# docs/EVAL.md. Dev gates are strict because the rules were tuned on dev. Test gates are looser and aggregate,
+# because the test split holds wording the rules never saw, and a miss there should be reported, not hidden.
+dev:
+  audit: {per_rule_recall: 0.90, per_rule_precision: 0.95, micro_recall_wilson_low: 0.90, micro_precision_wilson_low: 0.90}
+  validators: {per_block_rule_recall: 0.95, per_block_rule_precision: 0.95, false_block_rate: 0.02, false_block_wilson_high: 0.08}
+  retrieval: {lexical_recall_at_3: 0.85, lexical_mrr: 0.70, paraphrase_recall_at_3_floor: 0.30}
+  citations: {rejection_recall: 0.99, false_reject_rate: 0.02}
+  latency: {audit_p95_ms: 50, validation_p95_ms: 200}
+test:
+  audit: {micro_recall_wilson_low: 0.85, micro_precision_wilson_low: 0.85, per_rule_recall_floor: 0.50}
+  validators: {micro_recall_wilson_low: 0.85, micro_precision_wilson_low: 0.85, false_block_rate: 0.05, false_block_wilson_high: 0.15}
+  retrieval: {lexical_recall_at_3: 0.75, lexical_mrr: 0.60, paraphrase_recall_at_3_floor: 0.20}
+  citations: {rejection_recall: 0.95, false_reject_rate: 0.05}
+  latency: {audit_p95_ms: 50, validation_p95_ms: 200}
+e2e:
+  must_hold: [no_blocked_reached_approval, every_applied_matches_approved_hash, every_applied_verified_in_store, every_run_finished]
+agent:
+  note: "Thresholds stay unset until the first live dev run. This gate reports SKIPPED without a key, never PASS."

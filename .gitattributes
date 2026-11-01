@@ -1,0 +1,3 @@
+* text=auto eol=lf
+eval/datasets/** -text
+*.png binary

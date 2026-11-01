@@ -1,0 +1,261 @@
+{
+ "cases": 386,
+ "command": "python -m gatekeeper_eval all --split dev",
+ "dataset_test_sha256": "f3f0f6c7307b75d09b24adfe1c9113d53dfef622805312a2f4c79cc67fd4eb0f",
+ "false_block": {
+  "cases": [],
+  "ci95": [
+   0.0,
+   0.03664194365595336
+  ],
+  "denominator": 101,
+  "false_blocks": 0,
+  "rate": 0.0
+ },
+ "frozen_test_split_intact": false,
+ "gate": "PASS",
+ "gate_failures": [],
+ "git_sha": "unknown",
+ "kinds": {
+  "clean": 74,
+  "hard_negative": 12,
+  "positive": 300
+ },
+ "latency_ms": {
+  "p50": 0.5414000042947009,
+  "p95": 0.9938000002875924
+ },
+ "limits": [
+  "All data is synthetic. Labels are true by construction, and defect rates here are not real-world prevalence.",
+  "The same engineer wrote the rules and the datasets, so independence is procedural, not absolute.",
+  "With about 30 positives per rule, per-rule intervals are wide.",
+  "These numbers measure rules against their specification, not against real merchants or a real LLM."
+ ],
+ "micro_block_rules": {
+  "f1": 1.0,
+  "fn": 0,
+  "fp": 0,
+  "precision": 1.0,
+  "precision_ci95": [
+   0.9885952328928495,
+   1.0
+  ],
+  "recall": 1.0,
+  "recall_ci95": [
+   0.9885952328928495,
+   1.0
+  ],
+  "support": 333,
+  "tp": 333
+ },
+ "misses": [],
+ "per_rule": {
+  "V01": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "V02": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "support": 15,
+   "tp": 15
+  },
+  "V03": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.9258973488472576,
+    0.9999999999999999
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.9258973488472576,
+    0.9999999999999999
+   ],
+   "support": 48,
+   "tp": 48
+  },
+  "V04": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "V05": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "V06": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "V07": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "support": 15,
+   "tp": 15
+  },
+  "V08": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.9213457380593594,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.9213457380593594,
+    1.0
+   ],
+   "support": 45,
+   "tp": 45
+  },
+  "V09": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "support": 15,
+   "tp": 15
+  },
+  "V10": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "support": 15,
+   "tp": 15
+  },
+  "V11": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "support": 15,
+   "tp": 15
+  },
+  "V12": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.9398260695220669,
+    0.9999999999999999
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.9398260695220669,
+    0.9999999999999999
+   ],
+   "support": 60,
+   "tp": 60
+  }
+ },
+ "ran_at_utc": "20261101T005423Z",
+ "split": "dev",
+ "suite": "validators"
+}

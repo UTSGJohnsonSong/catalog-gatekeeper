@@ -1,0 +1,147 @@
+{
+ "cases": 37,
+ "chunks": 19,
+ "command": "python -m gatekeeper_eval all --split dev",
+ "dataset_test_sha256": "f3f0f6c7307b75d09b24adfe1c9113d53dfef622805312a2f4c79cc67fd4eb0f",
+ "embedder": "hashing-tfidf-v1-d1024",
+ "frozen_test_split_intact": false,
+ "gate": "PASS",
+ "gate_failures": [],
+ "git_sha": "unknown",
+ "latency_ms": {
+  "p50": 0.7570999878225848,
+  "p95": 1.193300005979836
+ },
+ "limits": [
+  "All data is synthetic. Labels are true by construction, and defect rates here are not real-world prevalence.",
+  "The same engineer wrote the rules and the datasets, so independence is procedural, not absolute.",
+  "With about 30 positives per rule, per-rule intervals are wide.",
+  "These numbers measure rules against their specification, not against real merchants or a real LLM."
+ ],
+ "misses": [
+  {
+   "gold": [
+    "returns#000"
+   ],
+   "got": [
+    "returns#003",
+    "returns#002",
+    "warranty#000"
+   ],
+   "id": "p01",
+   "question": "Can I send back a jumper I never wore a month later?"
+  },
+  {
+   "gold": [
+    "returns#002"
+   ],
+   "got": [
+    "shipping#002",
+    "sizing#001",
+    "returns#003"
+   ],
+   "id": "p03",
+   "question": "I want the same thing in another colour instead."
+  },
+  {
+   "gold": [
+    "shipping#000"
+   ],
+   "got": [
+    "care-and-materials#002",
+    "care-and-materials#003",
+    "care-and-materials#001"
+   ],
+   "id": "p06",
+   "question": "How quickly will my package get to Toronto?"
+  },
+  {
+   "gold": [
+    "care-and-materials#000"
+   ],
+   "got": [
+    "returns#000",
+    "shipping#000",
+    "returns#001"
+   ],
+   "id": "p13",
+   "question": "Can I throw my sweater in the dryer?"
+  },
+  {
+   "gold": [
+    "care-and-materials#000"
+   ],
+   "got": [
+    "warranty#003",
+    "shipping#001",
+    "sizing#000"
+   ],
+   "id": "p14",
+   "question": "My tee got smaller after laundry."
+  },
+  {
+   "gold": [
+    "care-and-materials#002"
+   ],
+   "got": [
+    "warranty#003",
+    "shipping#001",
+    "shipping#000"
+   ],
+   "id": "p16",
+   "question": "Rain no longer rolls off my coat."
+  },
+  {
+   "gold": [
+    "sizing#000"
+   ],
+   "got": [
+    "returns#001",
+    "warranty#000",
+    "returns#000"
+   ],
+   "id": "p17",
+   "question": "I am between a medium and a large, what should I pick?"
+  }
+ ],
+ "ran_at_utc": "20261101T005342Z",
+ "split": "dev",
+ "subsets": {
+  "lexical": {
+   "mrr": 1.0,
+   "mrr_ci95_bootstrap": [
+    1.0,
+    1.0
+   ],
+   "n": 21,
+   "recall_at_1": 1.0,
+   "recall_at_3": 1.0,
+   "recall_at_3_ci95": [
+    0.8453561767357979,
+    0.9999999999999999
+   ],
+   "recall_at_5": 1.0
+  },
+  "paraphrase": {
+   "mrr": 0.27361111111111114,
+   "mrr_ci95_bootstrap": [
+    0.12083333333333333,
+    0.4444444444444444
+   ],
+   "n": 12,
+   "recall_at_1": 0.08333333333333333,
+   "recall_at_3": 0.4166666666666667,
+   "recall_at_3_ci95": [
+    0.19325746190524656,
+    0.6804926643446272
+   ],
+   "recall_at_5": 0.5833333333333334
+  }
+ },
+ "suite": "retrieval",
+ "unanswerable": {
+  "n": 4,
+  "top_score_mean": 0.04841687839057221
+ },
+ "what_this_measures": "Lexical hashed TF-IDF over pgvector, on a small hand-written question set. Paraphrases show its limit."
+}
