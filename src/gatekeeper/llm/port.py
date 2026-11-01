@@ -96,5 +96,7 @@ def billable_cost(model: str, usage: Usage) -> Decimal:
     known = cost_usd(model, usage)
     if known is not None:
         return known
+    if usage == Usage():
+        return Decimal(0)  # The template model uses no tokens, so there is nothing to price.
     log.error("no price for model %s; charging the highest known rate", model)
     return _price(max(_pricing().values(), key=lambda rates: rates["output"]), usage)
