@@ -1,0 +1,11 @@
+$ npm run typecheck; npm test; npm run build
+> tsc --noEmit
+
+ Test Files  1 passed (1)
+      Tests  22 passed (22)
+   Start at  21:56:53
+   Duration  1.27s (environment 58%, tests 23%, setup 9%, import 8%, transform 3%)
+
+dist/assets/index-gfwLELRp.js                                       320.27 kB │ gzip: 100.88 kB
+
+[32m✓ built in 143ms[39m

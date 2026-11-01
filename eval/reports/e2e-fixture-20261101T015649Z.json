@@ -1,0 +1,49 @@
+{
+ "agent_metrics": null,
+ "applied": 14,
+ "blocked_approval_attempts_refused": 3,
+ "catalog_size": 40,
+ "command": "python -m gatekeeper_eval all --split test",
+ "console_summary": "e2e (fixture): PASS: PLUMBING ONLY: 17 products, statuses {'pending_review': 14, 'blocked': 3}, applied 14, fixable findings 17 to 3, invariants {'no_blocked_reached_approval': True, 'every_applied_matches_approved_hash': True, 'every_applied_verified_in_store': True, 'every_run_finished': True, 'every_approved_reached_a_verified_outcome': True}",
+ "dataset_test_sha256": "463d3008423fcd1a225920d568dded514ee1e77405c946a1f72fd2e43152cd39",
+ "fixable_findings_after": 3,
+ "fixable_findings_before": 17,
+ "frozen_test_split_intact": true,
+ "gate": "PASS",
+ "gate_failures": [],
+ "git_sha": "424ef82c",
+ "invariants": {
+  "every_applied_matches_approved_hash": true,
+  "every_applied_verified_in_store": true,
+  "every_approved_reached_a_verified_outcome": true,
+  "every_run_finished": true,
+  "no_blocked_reached_approval": true
+ },
+ "known_failures": [],
+ "limits": [
+  "All data is synthetic. Labels are true by construction, and defect rates here are not real-world prevalence.",
+  "The same engineer wrote the rules and the datasets, so independence is procedural, not absolute.",
+  "With about 30 positives per rule, per-rule intervals are wide.",
+  "These numbers measure rules against their specification, not against real merchants or a real LLM."
+ ],
+ "measures": "plumbing only; not model accuracy. The model is a deterministic template script.",
+ "model": "heuristic-v1",
+ "products_with_fixable_findings": 17,
+ "proposal_statuses": {
+  "blocked": 3,
+  "pending_review": 14
+ },
+ "provider": "heuristic",
+ "ran_at_utc": "20261101T015649Z",
+ "seconds_per_product_no_model": {
+  "p50": 0.04368170000088867,
+  "p95": 0.051032300005317666
+ },
+ "split": "fixture",
+ "suite": "e2e",
+ "template_citations": {
+  "total": 9,
+  "verified": 8
+ },
+ "uncommitted_source_changes": false
+}

@@ -1,0 +1,8 @@
+$ docker compose down -v; docker compose up -d --wait --build
+ Network shopify-catalog-gatekeeper_default Removed 
+ Container shopify-catalog-gatekeeper-mcp-1 Waiting 
+ Container shopify-catalog-gatekeeper-db-1 Healthy 
+ Container shopify-catalog-gatekeeper-worker-1 Healthy 
+ Container shopify-catalog-gatekeeper-mcp-1 Healthy 
+ Container shopify-catalog-gatekeeper-migrate-1 Exited 
+ Container shopify-catalog-gatekeeper-api-1 Healthy 

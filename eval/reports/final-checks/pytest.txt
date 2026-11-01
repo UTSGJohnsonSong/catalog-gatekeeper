@@ -1,0 +1,85 @@
+$ pytest tests --cov
+........................................................................ [ 15%]
+........................................................................ [ 30%]
+........................................................................ [ 46%]
+........................................................................ [ 61%]
+........................................................................ [ 77%]
+........................................................................ [ 92%]
+.................................                                        [100%]
+=============================== tests coverage ================================
+_______________ coverage: platform win32, python 3.11.9-final-0 _______________
+
+Name                                              Stmts   Miss  Cover
+---------------------------------------------------------------------
+src\gatekeeper\__init__.py                            0      0   100%
+src\gatekeeper\agent\__init__.py                      0      0   100%
+src\gatekeeper\agent\budget.py                       42      1    98%
+src\gatekeeper\agent\fence.py                        21      0   100%
+src\gatekeeper\agent\loop.py                        108      1    99%
+src\gatekeeper\agent\prompts.py                       4      0   100%
+src\gatekeeper\agent\tools.py                       144      3    98%
+src\gatekeeper\api\__init__.py                        0      0   100%
+src\gatekeeper\api\app.py                           237     43    82%
+src\gatekeeper\api\auth.py                           42      0   100%
+src\gatekeeper\api\schemas.py                       123      0   100%
+src\gatekeeper\config.py                             75      1    99%
+src\gatekeeper\context.py                            50     20    60%
+src\gatekeeper\db.py                                 25      0   100%
+src\gatekeeper\domain\__init__.py                     0      0   100%
+src\gatekeeper\domain\canonical.py                   26      0   100%
+src\gatekeeper\domain\product.py                     41      0   100%
+src\gatekeeper\domain\risk.py                        29      0   100%
+src\gatekeeper\domain\states.py                       3      0   100%
+src\gatekeeper\jobs.py                               42      0   100%
+src\gatekeeper\llm\__init__.py                        0      0   100%
+src\gatekeeper\llm\anthropic_provider.py             38      2    95%
+src\gatekeeper\llm\heuristic.py                     111      7    94%
+src\gatekeeper\llm\judge.py                          55      2    96%
+src\gatekeeper\llm\port.py                           63      0   100%
+src\gatekeeper\llm\scripted.py                       25      1    96%
+src\gatekeeper\migrate.py                            49      1    98%
+src\gatekeeper\rag\__init__.py                        0      0   100%
+src\gatekeeper\rag\chunker.py                        36      3    92%
+src\gatekeeper\rag\citations.py                      47      0   100%
+src\gatekeeper\rag\embedder.py                       52      0   100%
+src\gatekeeper\rag\store.py                          48      7    85%
+src\gatekeeper\rules\__init__.py                      0      0   100%
+src\gatekeeper\rules\audit.py                       104      3    97%
+src\gatekeeper\rules\spec.py                         22      0   100%
+src\gatekeeper\rules\text.py                        119      5    96%
+src\gatekeeper\rules\validators.py                  164      1    99%
+src\gatekeeper\seed.py                               37     37     0%
+src\gatekeeper\services\__init__.py                   0      0   100%
+src\gatekeeper\services\catalog.py                   47      0   100%
+src\gatekeeper\services\proposals.py                 89      8    91%
+src\gatekeeper\services\review.py                    47      3    94%
+src\gatekeeper\services\sync.py                      48      0   100%
+src\gatekeeper\services\webhooks.py                  69      1    99%
+src\gatekeeper\services\writeback.py                122      3    98%
+src\gatekeeper\shopify\__init__.py                    0      0   100%
+src\gatekeeper\shopify\fixture.py                    98     12    88%
+src\gatekeeper\shopify\live.py                       81      4    95%
+src\gatekeeper\shopify\mapper.py                     25      1    96%
+src\gatekeeper\shopify\port.py                       32      0   100%
+src\gatekeeper\shopify\webhook_hmac.py               10      0   100%
+src\gatekeeper\worker.py                            121     42    65%
+src\gatekeeper_eval\__init__.py                       0      0   100%
+src\gatekeeper_eval\__main__.py                      94     41    56%
+src\gatekeeper_eval\freeze.py                        26      0   100%
+src\gatekeeper_eval\gates.py                         74      8    89%
+src\gatekeeper_eval\generator\__init__.py             0      0   100%
+src\gatekeeper_eval\generator\audit_cases.py         93      0   100%
+src\gatekeeper_eval\generator\base_products.py       26      0   100%
+src\gatekeeper_eval\generator\build.py              120      4    97%
+src\gatekeeper_eval\generator\invariants.py          15      0   100%
+src\gatekeeper_eval\generator\policy_qa.py            3      0   100%
+src\gatekeeper_eval\generator\proposal_cases.py     105      0   100%
+src\gatekeeper_eval\generator\wording_pools.py       11      0   100%
+src\gatekeeper_eval\metrics.py                       65      1    98%
+src\gatekeeper_eval\runner.py                       234    145    38%
+src\gatekeeper_mcp\__init__.py                        0      0   100%
+src\gatekeeper_mcp\__main__.py                       24     24     0%
+src\gatekeeper_mcp\server.py                         84      3    96%
+---------------------------------------------------------------------
+TOTAL                                              3745    438    88%
+465 passed in 56.00s

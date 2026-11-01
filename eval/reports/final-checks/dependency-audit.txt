@@ -1,0 +1,8 @@
+$ pip-audit -r requirements.lock
+WARNING:pip_audit._cli:--no-deps is supported, but users are encouraged to fully hash their pinned dependencies
+WARNING:pip_audit._cli:Consider using a tool like `pip-compile`: https://pip-tools.readthedocs.io/en/latest/#using-hashes
+WARNING:pip_audit._cache:Failed to write to cache directory, performance may be degraded: [WinError 17] 系统无法将文件移到不同的磁盘驱动器。: 'C:\\Users\\<user>\\AppData\\Local\\pip-audit\\Cache\\f\\4\\0\\0\\3\\tmptif2ozfr' -> 'C:\\Users\\<user>\\AppData\\Local\\pip-audit\\Cache\\f\\4\\0\\0\\3\\f4003693a66ed0293c01af94d60bbcea19099ede07650797cdaf20d8'
+No known vulnerabilities found
+pip-audit exit=0
+$ npm audit --omit=dev
+found 0 vulnerabilities

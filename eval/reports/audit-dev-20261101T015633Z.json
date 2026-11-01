@@ -1,0 +1,274 @@
+{
+ "cases": 468,
+ "command": "python -m gatekeeper_eval all --split dev",
+ "console_summary": "audit (dev): PASS: micro precision 1.000 recall 1.000 (tp=393 fp=0 fn=0), cases=468, p95=0.35 ms",
+ "dataset_test_sha256": "463d3008423fcd1a225920d568dded514ee1e77405c946a1f72fd2e43152cd39",
+ "exact_match_rate": 1.0,
+ "frozen_test_split_intact": true,
+ "gate": "PASS",
+ "gate_failures": [],
+ "git_sha": "424ef82c",
+ "kinds": {
+  "clean": 59,
+  "hard_negative": 19,
+  "positive": 390
+ },
+ "known_failures": [],
+ "latency_ms": {
+  "p50": 0.16310000501107424,
+  "p95": 0.34929999674204737
+ },
+ "limits": [
+  "All data is synthetic. Labels are true by construction, and defect rates here are not real-world prevalence.",
+  "The same engineer wrote the rules and the datasets, so independence is procedural, not absolute.",
+  "With about 30 positives per rule, per-rule intervals are wide.",
+  "These numbers measure rules against their specification, not against real merchants or a real LLM."
+ ],
+ "macro_precision": 1.0,
+ "macro_recall": 1.0,
+ "micro": {
+  "f1": 1.0,
+  "fn": 0,
+  "fp": 0,
+  "precision": 1.0,
+  "precision_ci95": [
+   0.9903195632715923,
+   0.9999999999999999
+  ],
+  "recall": 1.0,
+  "recall_ci95": [
+   0.9903195632715923,
+   0.9999999999999999
+  ],
+  "support": 393,
+  "tp": 393
+ },
+ "misses": [],
+ "per_rule": {
+  "A01": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "A02": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.889740999265246,
+    0.9999999999999999
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.889740999265246,
+    0.9999999999999999
+   ],
+   "support": 31,
+   "tp": 31
+  },
+  "A03": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "A04": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "A05": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "A06": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.889740999265246,
+    0.9999999999999999
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.889740999265246,
+    0.9999999999999999
+   ],
+   "support": 31,
+   "tp": 31
+  },
+  "A07": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "A08": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.889740999265246,
+    0.9999999999999999
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.889740999265246,
+    0.9999999999999999
+   ],
+   "support": 31,
+   "tp": 31
+  },
+  "A09": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "A10": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "A11": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "A12": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "A13": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  }
+ },
+ "ran_at_utc": "20261101T015633Z",
+ "split": "dev",
+ "suite": "audit",
+ "uncommitted_source_changes": false
+}

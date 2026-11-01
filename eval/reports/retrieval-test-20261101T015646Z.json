@@ -1,0 +1,65 @@
+{
+ "cases": 33,
+ "chunks": 19,
+ "command": "python -m gatekeeper_eval all --split test",
+ "console_summary": "retrieval (test): PASS: lexical r@3 1.000 mrr 0.947 (n=19); paraphrase r@3 0.250 mrr 0.156 (n=8); embedder hashing-tfidf-v1-d1024",
+ "dataset_test_sha256": "463d3008423fcd1a225920d568dded514ee1e77405c946a1f72fd2e43152cd39",
+ "embedder": "hashing-tfidf-v1-d1024",
+ "frozen_test_split_intact": true,
+ "gate": "PASS",
+ "gate_failures": [],
+ "git_sha": "424ef82c",
+ "known_failures": [],
+ "latency_ms": {
+  "p50": 0.7770000083837658,
+  "p95": 1.2072999961674213
+ },
+ "limits": [
+  "All data is synthetic. Labels are true by construction, and defect rates here are not real-world prevalence.",
+  "The same engineer wrote the rules and the datasets, so independence is procedural, not absolute.",
+  "With about 30 positives per rule, per-rule intervals are wide.",
+  "These numbers measure rules against their specification, not against real merchants or a real LLM."
+ ],
+ "misses": "6 (hidden on the test split)",
+ "ran_at_utc": "20261101T015646Z",
+ "split": "test",
+ "subsets": {
+  "lexical": {
+   "mrr": 0.9473684210526315,
+   "mrr_ci95_bootstrap": [
+    0.868421052631579,
+    1.0
+   ],
+   "n": 19,
+   "recall_at_1": 0.8947368421052632,
+   "recall_at_3": 1.0,
+   "recall_at_3_ci95": [
+    0.8318156346315496,
+    1.0
+   ],
+   "recall_at_5": 1.0
+  },
+  "paraphrase": {
+   "mrr": 0.15625,
+   "mrr_ci95_bootstrap": [
+    0.0,
+    0.3125
+   ],
+   "n": 8,
+   "recall_at_1": 0.0,
+   "recall_at_3": 0.25,
+   "recall_at_3_ci95": [
+    0.07147768885802763,
+    0.5907301208974108
+   ],
+   "recall_at_5": 0.375
+  }
+ },
+ "suite": "retrieval",
+ "unanswerable": {
+  "n": 6,
+  "top_score_mean": 0.06691801432236771
+ },
+ "uncommitted_source_changes": false,
+ "what_this_measures": "Lexical hashed TF-IDF over pgvector, on a small hand-written question set. Paraphrases show its limit."
+}

@@ -1,0 +1,33 @@
+$ python -m gatekeeper_eval check-frozen
+frozen test split intact
+$ python -m gatekeeper_eval all --split dev
+audit (dev): PASS: micro precision 1.000 recall 1.000 (tp=393 fp=0 fn=0), cases=468, p95=0.35 ms
+  report: eval\reports\audit-dev-20261101T015633Z.json
+validators (dev): PASS: micro precision 1.000 recall 1.000 (tp=331 fp=0 fn=0), false blocks 0/102, cases=387, p95=1.05 ms
+  report: eval\reports\validators-dev-20261101T015633Z.json
+citations (dev): PASS: rejection recall 1.000 (n=51), false reject rate 0.000 (n=25)
+  report: eval\reports\citations-dev-20261101T015633Z.json
+retrieval (dev): PASS: lexical r@3 1.000 mrr 1.000 (n=21); paraphrase r@3 0.417 mrr 0.274 (n=12); embedder hashing-tfidf-v1-d1024
+  report: eval\reports\retrieval-dev-20261101T015634Z.json
+e2e (fixture): PASS: PLUMBING ONLY: 17 products, statuses {'pending_review': 14, 'blocked': 3}, applied 14, fixable findings 17 to 3, invariants {'no_blocked_reached_approval': True, 'every_applied_matches_approved_hash': True, 'every_applied_verified_in_store': True, 'every_run_finished': True, 'every_approved_reached_a_verified_outcome': True}
+  report: eval\reports\e2e-fixture-20261101T015644Z.json
+Agent accuracy: NOT MEASURED (no real model was called).
+exit=0
+$ python -m gatekeeper_eval all --split test
+audit (test): PASS_WITH_KNOWN_FAILURES: micro precision 0.960 recall 0.911 (tp=358 fp=15 fn=35), cases=468, p95=0.24 ms
+  report: eval\reports\audit-test-20261101T015645Z.json
+  known failure, not tuned away: A13 recall: 0.3333 is below 0.5
+validators (test): PASS: micro precision 0.982 recall 0.979 (tp=323 fp=6 fn=7), false blocks 2/102, cases=387, p95=1.08 ms
+  report: eval\reports\validators-test-20261101T015645Z.json
+citations (test): PASS: rejection recall 1.000 (n=57), false reject rate 0.000 (n=25)
+  report: eval\reports\citations-test-20261101T015645Z.json
+retrieval (test): PASS: lexical r@3 1.000 mrr 0.947 (n=19); paraphrase r@3 0.250 mrr 0.156 (n=8); embedder hashing-tfidf-v1-d1024
+  report: eval\reports\retrieval-test-20261101T015646Z.json
+e2e (fixture): PASS: PLUMBING ONLY: 17 products, statuses {'pending_review': 14, 'blocked': 3}, applied 14, fixable findings 17 to 3, invariants {'no_blocked_reached_approval': True, 'every_applied_matches_approved_hash': True, 'every_applied_verified_in_store': True, 'every_run_finished': True, 'every_approved_reached_a_verified_outcome': True}
+  report: eval\reports\e2e-fixture-20261101T015649Z.json
+Agent accuracy: NOT MEASURED (no real model was called).
+exit=0
+$ python -m gatekeeper_eval agent --split dev
+agent (dev): SKIPPED: "no ANTHROPIC_API_KEY"
+Agent accuracy: NOT MEASURED (no ANTHROPIC_API_KEY)
+exit=0
