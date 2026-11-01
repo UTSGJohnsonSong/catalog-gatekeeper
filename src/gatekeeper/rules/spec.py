@@ -1,4 +1,5 @@
-"""Thresholds and metadata. A test asserts these equal eval/spec/rules_spec.yaml, which the eval reads."""
+"""Thresholds and metadata. A test asserts that the description and SEO limits and the rule ids equal
+eval/spec/rules_spec.yaml, which the eval generator reads. The other constants here are not mirrored there."""
 
 from __future__ import annotations
 

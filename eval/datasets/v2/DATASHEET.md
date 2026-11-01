@@ -1,4 +1,4 @@
-# Datasheet: eval dataset v1
+# Datasheet: eval dataset v2
 
 **What it is.** Synthetic products and proposals for measuring deterministic rules. Built by `python -m gatekeeper_eval build` from hand-written templates (`src/gatekeeper_eval/generator/`). No scraped, marketplace, customer or personal data. Store policies are written for a fictional store.
 
@@ -13,6 +13,6 @@
 - Defect rates here are chosen by construction, about 30 positives per rule per split. They are not real-world prevalence.
 - Product text is templated, and real listings are messier.
 - All text is English.
-- The test split was written after the dev pools and before its first run, but its author knew how the rules work.
+- The test pool was written just before its first run, by an author who knew how the rules work. v1 test wording was seen during review and moved into dev.
 
 **What not to conclude.** These numbers say how well the rules match their written specification on constructed cases. They do not say how often a real catalog is fixed correctly, and they say nothing about an LLM.

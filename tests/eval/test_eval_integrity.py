@@ -266,3 +266,21 @@ def test_skipped_agent_report_is_saved_without_a_pass(monkeypatch, tmp_path):
     assert cli.main() == 0
     saved = json.loads(next(tmp_path.glob("agent-*.json")).read_text(encoding="utf-8"))
     assert saved["gate"] == "SKIPPED" and saved["agent_metrics"] is None
+
+
+class TestKnownFailureRatchet:
+    report = {"suite": "audit", "split": "test"}
+
+    def test_a_listed_failure_at_its_baseline_is_known_not_blocking(self):
+        assert gates.split_known(self.report, ["A13 recall: 0.3333 is below 0.5"]) == (
+            [],
+            ["A13 recall: 0.3333 is below 0.5"],
+        )
+
+    def test_it_blocks_again_if_it_gets_worse(self):
+        assert gates.split_known(self.report, ["A13 recall: 0.2000 is below 0.5"])[0]
+
+    def test_other_failures_and_other_splits_still_block(self):
+        assert gates.split_known(self.report, ["A03 recall: 0.4000 is below 0.5"])[0]
+        assert gates.split_known({"suite": "audit", "split": "dev"}, ["A13 recall: 0.3333 is below 0.9"])[0]
+        assert gates.split_known(self.report, ["the test split is not frozen or has changed"])[0]

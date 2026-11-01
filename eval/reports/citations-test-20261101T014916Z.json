@@ -1,0 +1,45 @@
+{
+ "cases": 82,
+ "command": "python -m gatekeeper_eval all --split test",
+ "console_summary": "citations (test): PASS: rejection recall 1.000 (n=57), false reject rate 0.000 (n=25)",
+ "dataset_test_sha256": "463d3008423fcd1a225920d568dded514ee1e77405c946a1f72fd2e43152cd39",
+ "false_reject_ci95": [
+  0.0,
+  0.13319649395317873
+ ],
+ "false_reject_rate": 0.0,
+ "frozen_test_split_intact": true,
+ "gate": "PASS",
+ "gate_failures": [],
+ "git_sha": "7ce3d50f",
+ "invalid_denominator": 57,
+ "kinds": {
+  "altered": 1,
+  "doc_mismatch": 10,
+  "dropped": 11,
+  "ellipsis": 10,
+  "not_retrieved": 7,
+  "reordered": 5,
+  "spans_chunks": 7,
+  "valid_typography": 25,
+  "wrong_chunk": 6
+ },
+ "limits": [
+  "All data is synthetic. Labels are true by construction, and defect rates here are not real-world prevalence.",
+  "The same engineer wrote the rules and the datasets, so independence is procedural, not absolute.",
+  "With about 30 positives per rule, per-rule intervals are wide.",
+  "These numbers measure rules against their specification, not against real merchants or a real LLM."
+ ],
+ "misses": "hidden on the test split",
+ "ran_at_utc": "20261101T014916Z",
+ "rejection_recall": 1.0,
+ "rejection_recall_ci95": [
+  0.936858991216536,
+  0.9999999999999999
+ ],
+ "split": "test",
+ "suite": "citations",
+ "uncommitted_source_changes": false,
+ "valid_denominator": 25,
+ "what_this_measures": "The mechanical citation checker on constructed cases. Not an LLM's citation behaviour."
+}

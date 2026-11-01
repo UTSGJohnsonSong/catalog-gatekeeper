@@ -197,6 +197,7 @@ BEGIN
      OR NEW.proposed_hash IS DISTINCT FROM OLD.proposed_hash
      OR NEW.base_content_hash IS DISTINCT FROM OLD.base_content_hash
      OR NEW.product_id IS DISTINCT FROM OLD.product_id
+     OR NEW.shop_id IS DISTINCT FROM OLD.shop_id
      OR (OLD.approved_hash IS NOT NULL AND NEW.approved_hash IS DISTINCT FROM OLD.approved_hash)
   THEN
     RAISE EXCEPTION 'proposal content and approved_hash are immutable';

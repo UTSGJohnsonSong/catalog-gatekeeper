@@ -1,7 +1,7 @@
 """Mechanical citation check. It proves the quoted words exist in a chunk retrieved in this run.
 
-It does not prove the quote supports the claim. V05 and V07 add lexical coupling, and the judge may
-escalate a semantic mismatch.
+It does not prove the quote supports the claim or applies to this product. V05 and V07 add lexical coupling.
+The judge never sees citations, so that judgement rests with the human reviewer.
 """
 
 from __future__ import annotations

@@ -1,0 +1,263 @@
+{
+ "cases": 387,
+ "command": "python -m gatekeeper_eval all --split test",
+ "console_summary": "validators (test): PASS: micro precision 0.982 recall 0.979 (tp=323 fp=6 fn=7), false blocks 2/102, cases=387, p95=1.03 ms",
+ "dataset_test_sha256": "463d3008423fcd1a225920d568dded514ee1e77405c946a1f72fd2e43152cd39",
+ "false_block": {
+  "cases": "hidden on the test split",
+  "ci95": [
+   0.005393639125345434,
+   0.06869443210562613
+  ],
+  "denominator": 102,
+  "false_blocks": 2,
+  "rate": 0.0196078431372549
+ },
+ "frozen_test_split_intact": true,
+ "gate": "PASS",
+ "gate_failures": [],
+ "git_sha": "7ce3d50f",
+ "kinds": {
+  "clean": 75,
+  "hard_negative": 12,
+  "positive": 300
+ },
+ "latency_ms": {
+  "p50": 0.597400008700788,
+  "p95": 1.0289000056218356
+ },
+ "limits": [
+  "All data is synthetic. Labels are true by construction, and defect rates here are not real-world prevalence.",
+  "The same engineer wrote the rules and the datasets, so independence is procedural, not absolute.",
+  "With about 30 positives per rule, per-rule intervals are wide.",
+  "These numbers measure rules against their specification, not against real merchants or a real LLM."
+ ],
+ "micro_block_rules": {
+  "f1": 0.9802731411229135,
+  "fn": 7,
+  "fp": 6,
+  "precision": 0.9817629179331308,
+  "precision_ci95": [
+   0.9607892255163906,
+   0.9916157623216681
+  ],
+  "recall": 0.9787878787878788,
+  "recall_ci95": [
+   0.9568688818765642,
+   0.989687808481977
+  ],
+  "support": 330,
+  "tp": 323
+ },
+ "misses": "13 (hidden on the test split)",
+ "per_rule": {
+  "V01": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "V02": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "support": 15,
+   "tp": 15
+  },
+  "V03": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.9213457380593594,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.9213457380593594,
+    1.0
+   ],
+   "support": 45,
+   "tp": 45
+  },
+  "V04": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "V05": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.8864829086095221,
+    1.0
+   ],
+   "support": 30,
+   "tp": 30
+  },
+  "V06": {
+   "f1": 0.8679245283018869,
+   "fn": 7,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.8568788745827374,
+    1.0
+   ],
+   "recall": 0.7666666666666667,
+   "recall_ci95": [
+    0.5907132766967574,
+    0.8820776078949878
+   ],
+   "support": 30,
+   "tp": 23
+  },
+  "V07": {
+   "f1": 0.8333333333333333,
+   "fn": 0,
+   "fp": 6,
+   "precision": 0.7142857142857143,
+   "precision_ci95": [
+    0.500432261771624,
+    0.8618632425437179
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "support": 15,
+   "tp": 15
+  },
+  "V08": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.9213457380593594,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.9213457380593594,
+    1.0
+   ],
+   "support": 45,
+   "tp": 45
+  },
+  "V09": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "support": 15,
+   "tp": 15
+  },
+  "V10": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "support": 15,
+   "tp": 15
+  },
+  "V11": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.7961107336956521,
+    1.0
+   ],
+   "support": 15,
+   "tp": 15
+  },
+  "V12": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.9398260695220669,
+    0.9999999999999999
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.9398260695220669,
+    0.9999999999999999
+   ],
+   "support": 60,
+   "tp": 60
+  }
+ },
+ "ran_at_utc": "20261101T014916Z",
+ "split": "test",
+ "suite": "validators",
+ "uncommitted_source_changes": false
+}

@@ -2,7 +2,7 @@
 
 **Status:** accepted.
 
-The route verifies HMAC on raw bytes before parsing, inserts on a unique `X-Shopify-Webhook-Id`, enqueues, and returns. The job takes only a product id from the payload and refetches the store. So delivery order does not matter, and a payload cannot plant data. An hourly incremental sync catches missed deliveries.
+The route verifies HMAC on raw bytes before parsing, inserts on a unique `X-Shopify-Webhook-Id`, enqueues, and returns. The job takes only a product id from the payload and refetches the store. So delivery order does not matter, and a payload cannot plant data. An hourly incremental sync with a 2-hour lookback catches missed updates, and a daily full sync catches anything older and notices deleted products.
 
 **Known weakness:** the id headers are outside the HMAC. A captured signed body replayed with a fresh id skips dedupe. The effect is one extra refetch and no state change, which a test covers. Signal-only processing is what makes this harmless.
 

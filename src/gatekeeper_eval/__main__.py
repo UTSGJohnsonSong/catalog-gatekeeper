@@ -143,15 +143,18 @@ def main() -> int:
         report = suites[name]()
         report["frozen_test_split_intact"] = freezer.is_frozen_intact()
         failures = gates.judge(report)
-        report["console_summary"] = (
-            f"{name} ({report['split']}): {'PASS' if not failures else 'FAIL'}: {_summary(report)}"
-        )
-        path = _save(report, command_line, failures)
+        blocking, known = gates.split_known(report, failures)
+        verdict = "FAIL" if blocking else "PASS_WITH_KNOWN_FAILURES" if known else "PASS"
+        report["console_summary"] = f"{name} ({report['split']}): {verdict}: {_summary(report)}"
+        report["known_failures"] = known
+        path = _save(report, command_line, failures, gate=verdict)
         print(report["console_summary"])
         print(f"  report: {path.relative_to(REPORTS.parents[1])}")
-        for failure in failures:
+        for failure in blocking:
             print(f"  gate failure: {failure}")
-        failed = failed or bool(failures)
+        for failure in known:
+            print(f"  known failure, not tuned away: {failure}")
+        failed = failed or bool(blocking)
     print("Agent accuracy: NOT MEASURED (no real model was called).")
     return 1 if failed else 0
 

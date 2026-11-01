@@ -5,14 +5,14 @@
 | Store | Simulated by `FixtureShopify` in a Postgres schema | Banner: "The store is simulated." |
 | Model | `heuristic-v1`, a template script that speaks the tool protocol. It is not an LLM | Banner, proposal page, `agent_runs.mode = 'demo'`, `model` field in the API and MCP output |
 | Judge | Not run in demo mode, because a template cannot assess anything | No judge rows, `judge_status: disabled` |
-| Embeddings | Hashed TF-IDF. Lexical matching, no semantic understanding | `embedder_id` in every retrieval report |
+| Embeddings | Hashed TF-IDF. Lexical matching, no semantic understanding | `embedder` in every retrieval report |
 | Sign-in | Demo tokens exist only with `DEMO_MODE=1` and no configured tokens. Production refuses to boot with demo mode on | Banner: "Demo sign-in is on." |
 
 Rules that keep this honest:
 
-1. `agent_runs.model` holds what actually ran. The demo never records the hosted LLM's model id.
+1. `agent_runs.model` holds what actually served the run, including a fallback model. The demo never records the hosted LLM's model id.
 2. Eval reports carry `agent_metrics: null` unless a real model ran. A test fails if a plumbing report carries agent metrics.
-3. The agent gate prints `SKIPPED` without a key, never `PASS`.
+3. Without a key the agent suite prints and saves `SKIPPED`, and with a key it saves `NOT_GATED`. It never saves `PASS`, because no agent thresholds exist yet.
 4. Tests marked `pipeline_plumbing` exercise control flow with scripted models, and say that they do not measure model accuracy.
 
 ## The fixture is stricter than Shopify in one way

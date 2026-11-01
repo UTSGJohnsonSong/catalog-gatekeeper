@@ -4,7 +4,7 @@
 
 ## First five minutes
 
-1. Check `GET /readyz`. It reports database, migrations and worker heartbeat age.
+1. Check `GET /readyz`, which reports database, migrations and worker heartbeat age, and `GET /api/ops`, which counts dead jobs, failed and stuck writes, and failed runs. The queue page shows the same counts.
 2. Check queue age and dead jobs:
    ```sql
    SELECT status, count(*), min(run_after) FROM jobs GROUP BY status;
@@ -24,7 +24,7 @@
 | Write-back success | no `failed` without a known cause | `SELECT status, count(*) FROM proposals GROUP BY status` |
 | Worker heartbeat | under 120 s | `/readyz` |
 
-Logs are JSON on stdout, with `job_id`, `kind`, `proposal_id`, `run_id` where they apply. Tokens, HMAC values and product text are not logged.
+Logs are JSON on stdout, with `job_id`, `kind`, `proposal_id`, `run_id` where they apply. Call sites pass ids and error text, not tokens, HMAC values or product text. That is a convention, not a filter: exception text is logged as raised and nothing scrubs it. uvicorn's own access log is plain text.
 
 ## Symptoms
 
@@ -34,13 +34,13 @@ Logs are JSON on stdout, with `job_id`, `kind`, `proposal_id`, `run_id` where th
 | `/readyz` 503, `database: false` | RDS down, or credentials rotated | Check RDS events, then the `database-url-app` secret |
 | `/readyz` 503, old heartbeat | Worker crashed or stuck | Check worker logs and restart the ECS service. Jobs are safe: the reaper requeues after 10 minutes |
 | Dead jobs growing | A persistent error, shown in `last_error` | Fix the cause, then requeue: `UPDATE jobs SET status='queued', attempts=0, run_after=now() WHERE status='dead' AND id=...` |
-| Proposals stuck in `applying` | Worker died mid-write | The sweeper requeues after 2 minutes, and the advisory lock prevents a double writer. After 5 attempts the proposal becomes `failed` for a person |
-| `failed` with `verification_mismatch` | The store changed the text on write, for example HTML normalization, or a merchant edit raced us | Compare `writebacks.expected_after_hash` and `response`. If a normalization pattern, extend `html_canon` and add a test. Expect this on the first live runs |
+| Proposals stuck in `applying` | Worker died mid-write | The sweeper requeues after 2 minutes, and the advisory lock prevents a double writer. After 5 real write attempts the proposal becomes `failed`. A dead job is not revived automatically: fix the cause, then requeue it |
+| `failed` with `verification_mismatch` or `outcome_unknown` | The store changed the text on write, a merchant edit raced us, or a response was lost after a write. The text may be live | Compare the store with `writebacks.before_snapshot` and `request`. If it is a normalization pattern, extend `html_canon` and add a test. Expect this on the first live runs |
 | Spike of `stale` | Merchants editing during review, or a webhook flood | Usually correct behaviour. Re-run the agent on those products |
-| `budget_exceeded` or daily cap reached | Model spending more than expected | Read `agent_runs` and `llm_calls`. Raise the cap only with a reason. Do not fall back to the template model in production: it refuses to boot there on purpose |
+| `budget_exceeded` or daily cap reached | Model spending more than expected | Read `agent_runs` and `llm_calls`. Raise the cap only with a reason. Do not fall back to the template model in production: it refuses to boot there unless `ALLOW_DEMO_MODEL_IN_PROD` is set, which you should not do |
 | `no_finish` or `failed` runs rising | Model outage, or behaviour change after a model update | Check `agent_runs.error`. Pin `LLM_MODEL` and rerun the live eval |
 | Shopify throttling | Bucket exhausted during a large sync | Jobs defer themselves. Reduce sweep size if persistent |
-| Webhooks stop arriving | Shopify deletes a subscription after 8 failed deliveries over 4 hours | Re-register the subscription, then run a sync. The hourly reconcile covers the gap either way |
+| Webhooks stop arriving | Shopify deletes a subscription after 8 failed deliveries over 4 hours | Re-register the subscription, then run a sync. The hourly sync covers 2 hours back, and the daily full sync covers anything older |
 | False-block complaint | A lexical rule hit plain English | Read the evidence on the proposal. Add a hard negative to `eval/datasets` first, then change the rule, then run the gate |
 
 ## Procedures
@@ -49,7 +49,7 @@ Logs are JSON on stdout, with `job_id`, `kind`, `proposal_id`, `run_id` where th
 
 **Rotate reviewer tokens.** Update the `reviewer-tokens` secret and redeploy. Sessions hold only the token, so old tokens stop working at once.
 
-**Rotate the webhook secret.** Rotate in Shopify, update the secret, redeploy. Expect a window of up to an hour of 401s, covered by Shopify's retries and the hourly reconcile.
+**Rotate the webhook secret.** Rotate in Shopify, update the secret, redeploy. Expect a window of up to an hour of 401s, covered by Shopify's retries and the scheduled syncs.
 
 **Restore the database.** RDS keeps 7 days of automated backups. Restore to a new instance, update `database-url-*`, run the migrate task, then run a full sync. Proposals in `applying` at the restore point are recovered by the sweeper, which compares against the store before writing.
 

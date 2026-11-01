@@ -1,4 +1,5 @@
-"""Per-run budgets. Checked before every model call and every tool call."""
+"""Per-run budgets. Checked before every agent model call and every tool call. The judge's one call per proposal is
+not checked in advance, but its cost is added afterwards. Time is checked between calls, so one slow call can overrun."""
 
 from __future__ import annotations
 

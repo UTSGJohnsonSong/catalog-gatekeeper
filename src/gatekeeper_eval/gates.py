@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -111,3 +112,28 @@ def judge(report: dict[str, Any]) -> list[str]:
         _check(failures, "rejection recall", report["rejection_recall"], minimum=limits["rejection_recall"])
         _check(failures, "false reject rate", report["false_reject_rate"], maximum=limits["false_reject_rate"])
     return failures
+
+
+def split_known(report: dict[str, Any], failures: list[str]) -> tuple[list[str], list[str]]:
+    """Separates failures into (blocking, known). A known failure blocks again as soon as it gets worse than baseline."""
+    known_entries = yaml.safe_load(GATES_FILE.read_text(encoding="utf-8")).get("known_failures") or []
+    blocking: list[str] = []
+    known: list[str] = []
+    for failure in failures:
+        match = re.match(r"(.+?): (-?[0-9.]+) is ", failure)
+        entry = next(
+            (
+                e
+                for e in known_entries
+                if match
+                and e["suite"] == report["suite"]
+                and e["split"] == report["split"]
+                and e["check"] == match.group(1)
+            ),
+            None,
+        )
+        if entry is not None and match and float(match.group(2)) >= float(entry["baseline"]) - 1e-4:
+            known.append(failure)
+        else:
+            blocking.append(failure)
+    return blocking, known

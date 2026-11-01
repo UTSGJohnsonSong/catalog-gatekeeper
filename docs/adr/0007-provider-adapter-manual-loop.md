@@ -2,7 +2,7 @@
 
 **Status:** accepted.
 
-The options were LangChain or LangGraph, the SDK's beta tool runner, or a manual loop on the provider's Python SDK. The loop here needs budget checks before every model call and tool call, a database row per call, and a run state machine that maps each stop reason to an outcome. In a framework those would be callbacks around someone else's loop. The loop is about 100 lines, and every line is explainable in an interview.
+The options were LangChain or LangGraph, the SDK's beta tool runner, or a manual loop on the provider's Python SDK. The loop here needs budget checks before every agent model call and tool call, a database row per model call, and a run state machine that maps each stop reason to an outcome. In a framework those would be callbacks around someone else's loop. The loop is about 100 lines, and every line is explainable in an interview.
 
 A small `LLMProvider` port keeps the provider swappable. `ScriptedProvider` drives tests, including a hijacked model. `HeuristicProvider` is the template demo model. `AnthropicProvider` is the real one.
 
