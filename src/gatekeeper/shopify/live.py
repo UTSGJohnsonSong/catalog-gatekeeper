@@ -2,6 +2,9 @@
 
 Shopify documents no precondition on productUpdate, so `expected_content_hash` is ignored here and the
 write-back service does refetch, compare, write, read back. The residual race is about one round trip.
+
+Only the first 25 variants and 10 media of a product are read, to stay under the query cost limit. A change beyond
+those does not change the content hash, and defects there are not found. See docs/adr/0006.
 """
 
 from __future__ import annotations
@@ -29,8 +32,8 @@ from gatekeeper.shopify.port import (
 _PRODUCT_FIELDS = """
   id handle title status vendor productType tags descriptionHtml updatedAt
   seo { title description }
-  variants(first: 100) { edges { node { id sku price selectedOptions { value } } } }
-  media(first: 50) { edges { node { id alt } } }
+  variants(first: 25) { edges { node { id sku price selectedOptions { value } } } }
+  media(first: 10) { edges { node { id alt } } }
 """
 
 QUERY_PRODUCTS = (
@@ -114,7 +117,7 @@ class LiveShopify:
         requested = cost.get("requestedQueryCost")
         if available is None or not rate or requested is None or available >= requested:
             return
-        self._sleep((requested - available) / rate + random.uniform(0, 0.25))
+        self._sleep((requested - available) / rate + random.uniform(0, 0.25))  # noqa: S311 - jitter, not security
 
     def list_products(
         self, *, cursor: str | None = None, first: int = 50, updated_since: datetime | None = None

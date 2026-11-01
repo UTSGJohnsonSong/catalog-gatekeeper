@@ -43,7 +43,7 @@ def approve(pool: Any, proposal_id: str, *, reviewer: str, review_hash: str, con
     stale_reason: str | None = None
     with tx(pool, f"reviewer:{reviewer}") as conn:
         row = conn.execute(
-            "SELECT p.*, pr.content_hash, pr.gid FROM proposals p JOIN products pr ON pr.id = p.product_id "
+            "SELECT p.*, pr.content_hash, pr.gid, pr.deleted_at FROM proposals p JOIN products pr ON pr.id = p.product_id "
             "WHERE p.id = %s FOR UPDATE OF p",
             (proposal_id,),
         ).fetchone()
@@ -51,7 +51,7 @@ def approve(pool: Any, proposal_id: str, *, reviewer: str, review_hash: str, con
             raise KeyError(proposal_id)
         if row["status"] != "pending_review":
             raise ReviewConflict(f"proposal is {row['status']}")
-        if row["base_content_hash"] != row["content_hash"]:
+        if row["base_content_hash"] != row["content_hash"] or row["deleted_at"] is not None:
             conn.execute("UPDATE proposals SET status = 'stale' WHERE id = %s", (proposal_id,))
             stale_reason = "the product changed after this fix was proposed"
         else:

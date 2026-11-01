@@ -70,6 +70,7 @@ CREATE TABLE policy_chunks (
   text text NOT NULL,
   embedder_id text NOT NULL,
   embedding vector NOT NULL,
+  retired_at timestamptz, -- a removed passage stays for the audit trail but can no longer be retrieved or cited
   UNIQUE (doc_id, ordinal),
   CHECK (id = doc_id || '#' || lpad(ordinal::text, 3, '0'))
 );
@@ -138,17 +139,22 @@ CREATE TABLE proposals (
   status proposal_status NOT NULL,
   risk_score int NOT NULL DEFAULT 0 CHECK (risk_score BETWEEN 0 AND 100),
   risk_reasons jsonb NOT NULL DEFAULT '[]',
+  judge_status text NOT NULL DEFAULT 'disabled' CHECK (judge_status IN ('disabled','skipped_blocked','ok','unavailable')),
+  judge_discarded int NOT NULL DEFAULT 0,
   approved_hash text,
   version int NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   decided_at timestamptz,
   applied_at timestamptz,
-  -- a rejected fix is never re-proposed for the same base
-  UNIQUE (product_id, base_content_hash, proposed_hash),
   CHECK (status NOT IN ('approved','applying','applied') OR approved_hash IS NOT NULL),
   CHECK (status NOT IN ('pending_review','blocked') OR approved_hash IS NULL)
 );
+
+-- A decided fix is never re-proposed for the same base. Blocked attempts do not count, so the same text can be
+-- resubmitted with a corrected citation.
+CREATE UNIQUE INDEX one_decided_fix_per_base ON proposals (product_id, base_content_hash, proposed_hash)
+  WHERE status <> 'blocked';
 
 -- 'blocked' is closed, so the agent may retry after a blocked attempt
 CREATE UNIQUE INDEX one_open_proposal_per_product ON proposals (product_id)
@@ -305,4 +311,5 @@ CREATE VIEW v_validation AS
 CREATE VIEW v_audit_log AS
   SELECT id, at, actor, action, entity_type, entity_id, detail FROM audit_log;
 CREATE VIEW v_policy_chunks AS
-  SELECT c.id, c.doc_id, c.ordinal, c.text, d.title AS doc_title FROM policy_chunks c JOIN policy_docs d ON d.id = c.doc_id;
+  SELECT c.id, c.doc_id, c.ordinal, c.text, d.title AS doc_title FROM policy_chunks c JOIN policy_docs d ON d.id = c.doc_id
+  WHERE c.retired_at IS NULL;

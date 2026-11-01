@@ -14,6 +14,6 @@ test:
   citations: {rejection_recall: 0.95, false_reject_rate: 0.05}
   latency: {audit_p95_ms: 50, validation_p95_ms: 200}
 e2e:
-  must_hold: [no_blocked_reached_approval, every_applied_matches_approved_hash, every_applied_verified_in_store, every_run_finished]
+  must_hold: [no_blocked_reached_approval, every_applied_matches_approved_hash, every_applied_verified_in_store, every_run_finished, every_approved_reached_a_verified_outcome]
 agent:
-  note: "Thresholds stay unset until the first live dev run. This gate reports SKIPPED without a key, never PASS."
+  note: "No thresholds until the first live dev run. Its report is saved as SKIPPED or NOT_GATED, never PASS."

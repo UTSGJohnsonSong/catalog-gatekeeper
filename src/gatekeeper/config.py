@@ -14,10 +14,11 @@ ADMIN_API_VERSION = "2026-10"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=None, extra="ignore", case_sensitive=False)
+    # hide_input_in_errors: a failed boot must not print secrets from the environment into the logs.
+    model_config = SettingsConfigDict(env_file=None, extra="ignore", case_sensitive=False, hide_input_in_errors=True)
 
     env: Literal["development", "test", "production"] = "development"
-    database_url: str = "postgresql://gatekeeper:gatekeeper@127.0.0.1:54329/gatekeeper"
+    database_url: str = Field(default="postgresql://gatekeeper:gatekeeper@127.0.0.1:54329/gatekeeper", repr=False)
     demo_mode: bool = False
     demo_autorun: int = 0
     fixtures_dir: Path = REPO_ROOT / "fixtures"
@@ -36,6 +37,8 @@ class Settings(BaseSettings):
     llm_judge_model: str | None = None
     llm_effort: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
     allow_demo_model_in_prod: bool = False
+    # Empty means any Host. Set for local stacks, so a page on another origin cannot reach them by DNS rebinding.
+    allowed_hosts: str = ""
 
     max_model_calls: int = 8
     max_tool_calls: int = 16
@@ -54,14 +57,25 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _refuse_unsafe_production(self) -> Settings:
-        if self.env != "production":
-            return self
         problems: list[str] = []
+        # These hold in every environment: public demo tokens must never sit in front of a real store.
+        if self.shopify_adapter == "live" and self.demo_mode:
+            problems.append("DEMO_MODE cannot be combined with the live Shopify adapter")
+        if self.shopify_adapter == "live" and "shopify_shop_domain" not in self.model_fields_set:
+            problems.append("SHOPIFY_SHOP_DOMAIN must be set explicitly with the live adapter")
+        if self.shopify_adapter == "live" and self.writeback_enabled and self.llm_provider == "heuristic":
+            problems.append("the template model cannot write to a live store")
+        if self.env != "production":
+            if problems:
+                raise ValueError("; ".join(problems))
+            return self
+        if self.shopify_adapter != "live":
+            problems.append("production requires SHOPIFY_ADAPTER=live; the fixture store is for demos and tests")
         if self.demo_mode:
             problems.append("DEMO_MODE must be off in production")
         if not self.reviewer_tokens or not self.reviewer_tokens.get_secret_value().strip():
             problems.append("REVIEWER_TOKENS is required in production")
-        if not self.shopify_webhook_secret:
+        if not self.shopify_webhook_secret or not self.shopify_webhook_secret.get_secret_value().strip():
             problems.append("SHOPIFY_WEBHOOK_SECRET is required in production")
         if self.llm_provider == "auto":
             problems.append("LLM_PROVIDER must be explicit in production")

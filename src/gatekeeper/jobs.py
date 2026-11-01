@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from psycopg.types.json import Jsonb
 
 from gatekeeper.db import tx
 
+log = logging.getLogger("gatekeeper.jobs")
 MAX_BACKOFF_SECONDS = 600
 
 
@@ -41,8 +43,9 @@ def defer(pool: Any, job_id: int, seconds: int, reason: str) -> None:
     """Try again later without using up an attempt, e.g. while the kill switch is off."""
     with tx(pool) as conn:
         conn.execute(
-            "UPDATE jobs SET status = 'queued', attempts = greatest(attempts - 1, 0), run_after = now() + make_interval(secs => %s), "
-            "locked_at = NULL, locked_by = NULL, last_error = %s WHERE id = %s",
+            "UPDATE jobs SET status = 'queued', attempts = greatest(attempts - 1, 0), "
+            "run_after = now() + make_interval(secs => %s), locked_at = NULL, locked_by = NULL, last_error = %s "
+            "WHERE id = %s",
             (seconds, reason[:500], job_id),
         )
 
@@ -52,35 +55,47 @@ def fail(pool: Any, job: dict[str, Any], error: str, *, retryable: bool = True) 
     backoff = min(MAX_BACKOFF_SECONDS, 2 ** job["attempts"])
     with tx(pool) as conn:
         conn.execute(
-            "UPDATE jobs SET status = %s, run_after = now() + make_interval(secs => %s), locked_at = NULL, locked_by = NULL, "
-            "last_error = %s WHERE id = %s",
+            "UPDATE jobs SET status = %s, run_after = now() + make_interval(secs => %s), locked_at = NULL, "
+            "locked_by = NULL, last_error = %s WHERE id = %s",
             ("dead" if dead else "queued", backoff, error[:2000], job["id"]),
         )
+    if dead:
+        log.error("job is dead: %s", error[:300], extra={"job_id": job["id"], "kind": job["kind"]})
     return "dead" if dead else "queued"
 
 
 def reap(pool: Any, *, older_than_seconds: int = 600) -> int:
-    """Requeue jobs whose worker died mid-run."""
+    """Recover jobs whose worker died mid-run. A job that keeps killing its worker goes dead instead of looping."""
     with tx(pool) as conn:
-        return conn.execute(
-            "UPDATE jobs SET status = 'queued', locked_at = NULL, locked_by = NULL, run_after = now() "
-            "WHERE status = 'running' AND locked_at < now() - make_interval(secs => %s)",
+        rows = conn.execute(
+            "UPDATE jobs SET status = CASE WHEN attempts >= max_attempts THEN 'dead'::job_status ELSE 'queued' END, "
+            "locked_at = NULL, locked_by = NULL, run_after = now(), last_error = 'worker died while running this job' "
+            "WHERE status = 'running' AND locked_at < now() - make_interval(secs => %s) RETURNING id, status::text AS status",
             (older_than_seconds,),
-        ).rowcount
+        ).fetchall()
+    if rows:
+        log.warning("reaped %d job(s) from dead workers: %s", len(rows), rows)
+    return len(rows)
 
 
 def sweep_applying(pool: Any, *, older_than_seconds: int = 120) -> int:
-    """Recover proposals stuck in 'applying'. The per-proposal advisory lock keeps this from racing a live writer."""
+    """Recover approved fixes whose apply job finished or vanished without an end state. Queued and running jobs
+    are left alone. Dead jobs are not revived automatically: they need a person and are counted in /api/ops. The
+    per-proposal advisory lock keeps this from racing a live writer."""
     with tx(pool, "worker:sweeper") as conn:
         rows = conn.execute(
-            "SELECT id FROM proposals WHERE status = 'applying' AND updated_at < now() - make_interval(secs => %s)",
+            "SELECT p.id FROM proposals p WHERE p.status IN ('applying','approved') "
+            "AND p.updated_at < now() - make_interval(secs => %s)",
             (older_than_seconds,),
         ).fetchall()
+        revived = 0
         for row in rows:
-            conn.execute(
+            revived += conn.execute(
                 "INSERT INTO jobs (kind, payload, dedupe_key) VALUES ('apply_writeback', %s, %s) "
                 "ON CONFLICT (dedupe_key) DO UPDATE SET status = 'queued', run_after = now(), attempts = 0 "
-                "WHERE jobs.status IN ('done','dead')",
+                "WHERE jobs.status = 'done'",
                 (Jsonb({"proposal_id": str(row["id"])}), f"apply:{row['id']}"),
-            )
-    return len(rows)
+            ).rowcount
+    if revived:
+        log.warning("requeued %d stuck write-back(s)", revived)
+    return revived

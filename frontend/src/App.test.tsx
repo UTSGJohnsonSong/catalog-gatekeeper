@@ -1,6 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ProposalDetail, ValidationRow } from "./api/client";
+import { ModeBanner } from "./App";
 import { DecisionBar } from "./components/DecisionBar";
 import { DiffPanel } from "./components/DiffPanel";
 import { Gate } from "./components/Gate";
@@ -39,6 +41,8 @@ function proposal(overrides: Partial<ProposalDetail> = {}): ProposalDetail {
     decided_at: null,
     applied_at: null,
     writeback_status: null,
+    writeback_errors: [],
+    judge_discarded: 0,
     judge_status: "disabled",
     ...overrides,
   };
@@ -145,5 +149,66 @@ describe("the gate", () => {
     render(<Gate rows={rows} />);
     expect(screen.getByText(/www\.bad\.example/)).toBeVisible();
     expect(screen.getByText(/claim the source does not support/)).toBeInTheDocument();
+  });
+});
+
+describe("honest labels", () => {
+  const banner = (meta: object | null) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        meta ? new Response(JSON.stringify(meta), { status: 200 }) : new Response("{}", { status: 500 }),
+      ),
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={client}>
+        <ModeBanner />
+      </QueryClientProvider>,
+    );
+  };
+  const demo = {
+    demo_mode: true,
+    model_mode: "demo",
+    model: "heuristic-v1",
+    provider: "heuristic",
+    shopify_adapter: "fixture",
+    judge: "disabled",
+    writeback_env_enabled: true,
+    writeback_shop_enabled: true,
+  };
+
+  it("says the model is a template and the store is simulated", async () => {
+    banner(demo);
+    await waitFor(() => expect(screen.getByText(/template script, not an LLM/)).toBeInTheDocument());
+    expect(screen.getByText(/store is simulated/)).toBeInTheDocument();
+  });
+
+  it("says when writing is off", async () => {
+    banner({ ...demo, writeback_shop_enabled: false });
+    await waitFor(() => expect(screen.getByText(/Writing to the store is switched off/)).toBeInTheDocument());
+  });
+
+  it("does not go quiet when the mode cannot be loaded", async () => {
+    banner(null);
+    await waitFor(() => expect(screen.getByText(/Could not confirm which model/)).toBeInTheDocument());
+  });
+});
+
+describe("failures stay visible", () => {
+  it("shows a conflict even after the status moved on", () => {
+    bar(proposal({ status: "approved" }), { error: "proposal is approved" });
+    expect(screen.getByRole("alert")).toHaveTextContent("proposal is approved");
+  });
+
+  it("says a failed write may have reached the store, and why", () => {
+    bar(proposal({ status: "failed", writeback_errors: [{ message: "outcome_unknown: an earlier write may have reached the store" }] }));
+    expect(screen.getByText(/may or may not hold this text/)).toBeInTheDocument();
+    expect(screen.getByText(/outcome_unknown/)).toBeInTheDocument();
+  });
+
+  it("says approving will wait when writing is off", () => {
+    render(<DecisionBar proposal={proposal()} busy={false} error={null} writesEnabled={false} onApprove={vi.fn()} onReject={vi.fn()} />);
+    expect(screen.getByRole("button", { name: /will wait/ })).toBeInTheDocument();
   });
 });

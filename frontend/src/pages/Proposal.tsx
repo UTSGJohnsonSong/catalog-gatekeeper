@@ -6,6 +6,13 @@ import { DecisionBar } from "../components/DecisionBar";
 import { DiffPanel } from "../components/DiffPanel";
 import { Gate } from "../components/Gate";
 
+const JUDGE_SENTENCE: Record<string, string> = {
+  disabled: "The LLM judge did not run.",
+  skipped_blocked: "The LLM judge did not run, because a check had already stopped this fix.",
+  ok: "The LLM judge ran. It can raise risk, but it cannot clear a check.",
+  unavailable: "The LLM judge failed, so nobody has assessed this. Risk was raised to reflect that.",
+};
+
 const STATUS_NAMES: Record<string, string> = {
   pending_review: "Needs review",
   blocked: "Blocked",
@@ -27,16 +34,24 @@ function ModelLine({ proposal }: { proposal: ProposalDetail }) {
   }
   return (
     <p className="hint">
-      Drafted by {proposal.model ?? "an unknown model"}.{" "}
-      {proposal.judge_status === "disabled" ? "The LLM judge did not run." : `Judge status: ${proposal.judge_status}.`}
+      Drafted by {proposal.model ?? "an unknown model"}. {JUDGE_SENTENCE[proposal.judge_status] ?? proposal.judge_status}
+      {proposal.judge_discarded > 0 && ` It raised ${proposal.judge_discarded} concern(s) with quotes that could not be found, so they were dropped.`}
     </p>
   );
 }
+
+const FLAG_SENTENCE: Record<string, string> = {
+  injection_suspected: "The model reported that this product's text tried to instruct it.",
+  insufficient_source_facts: "The model reported too few facts in the product to write a full description.",
+  policy_gap: "The model reported that the policy documents do not cover this.",
+  demo_adversarial: "This demo product makes the template produce a deliberately bad fix.",
+};
 
 export function ProposalPage() {
   const { id = "" } = useParams();
   const client = useQueryClient();
   const [error, setError] = useState<string | null>(null);
+  const { data: meta } = useQuery({ queryKey: ["meta"], queryFn: api.meta });
   const { data: proposal, isLoading, error: loadError } = useQuery({
     queryKey: ["proposal", id],
     queryFn: () => api.proposal(id),
@@ -82,6 +97,11 @@ export function ProposalPage() {
           {statusName(proposal.status)}, risk {proposal.risk_score}
         </p>
         <ModelLine proposal={proposal} />
+        {proposal.run_flags.map((flag) => (
+          <p className="flag" key={flag}>
+            {FLAG_SENTENCE[flag] ?? flag}
+          </p>
+        ))}
         {proposal.risk_reasons.length > 0 && <p className="hint">Risk comes from: {proposal.risk_reasons.join("; ")}.</p>}
 
         <h2>What would change</h2>
@@ -136,6 +156,7 @@ export function ProposalPage() {
           proposal={proposal}
           busy={approve.isPending || reject.isPending}
           error={error}
+          writesEnabled={meta ? meta.writeback_env_enabled && meta.writeback_shop_enabled : true}
           onApprove={(confirm) => {
             setError(null);
             approve.mutate(confirm);

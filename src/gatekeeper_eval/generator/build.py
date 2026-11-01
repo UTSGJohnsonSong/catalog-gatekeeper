@@ -16,7 +16,7 @@ from gatekeeper_eval.generator.policy_qa import QUESTIONS, UNANSWERABLE
 from gatekeeper_eval.generator.proposal_cases import build_proposal_cases
 
 ROOT = Path(__file__).resolve().parents[3]
-OUT = ROOT / "eval" / "datasets" / "v1"
+OUT = ROOT / "eval" / "datasets" / "v2"
 POLICIES = ROOT / "fixtures" / "policies"
 SEED = 2026
 

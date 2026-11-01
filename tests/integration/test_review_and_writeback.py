@@ -242,14 +242,20 @@ class TestApply:
         result = apply_proposal(ctx, proposal_id)
         assert result.detail == "approved_hash_mismatch" and ctx.shopify.update_calls == 0
 
-    def test_repeated_failures_end_in_failed_for_a_human(self, ctx):
+    def test_repeated_write_failures_end_in_failed_for_a_human(self, ctx):
         proposal_id, _ = approved_proposal(ctx)
-        ctx.shopify.fail_next(MAX_APPLY_ATTEMPTS, "transient")
+        calls = {"n": 0}
+
+        def never_lands(*args, **kwargs):
+            calls["n"] += 1
+            raise ShopifyTransient("connection dropped")
+
+        ctx.shopify.update_product = never_lands
         for _ in range(MAX_APPLY_ATTEMPTS):
             with pytest.raises(ShopifyTransient):
                 apply_proposal(ctx, proposal_id)
         assert apply_proposal(ctx, proposal_id).status == "failed"
-        assert ctx.shopify.update_calls == 0
+        assert calls["n"] == MAX_APPLY_ATTEMPTS
 
 
 class TestKillSwitch:

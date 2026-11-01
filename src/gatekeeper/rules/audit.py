@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
@@ -38,7 +39,11 @@ class Finding:
 
 def is_placeholder(visible: str) -> bool:
     normalized = norm(visible).strip(" .!-")
-    return normalized in spec.PLACEHOLDERS or "lorem ipsum" in norm(visible)
+    if normalized in spec.PLACEHOLDERS or "lorem ipsum" in normalized:
+        return True
+    if len(normalized.split()) > spec.PLACEHOLDER_MAX_WORDS:
+        return False
+    return any(re.search(pattern, normalized) for pattern in spec.PLACEHOLDER_PATTERNS)
 
 
 def _a01(p: Product) -> Finding | None:

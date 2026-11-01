@@ -20,11 +20,16 @@ def sha256_hex(data: bytes) -> str:
 _TAG = re.compile(r"<(/?)([a-zA-Z][a-zA-Z0-9]*)([^<>]*)>")
 _BETWEEN_TAGS = re.compile(r">\s+<")
 _SPACE = re.compile(r"\s+")
+# Stores may rewrite these on save. Decoding them keeps a write that landed from looking like a failed one.
+# &lt; and &gt; stay encoded: decoding them could turn text into a tag.
+_EQUIVALENT_ENTITIES = (("&amp;", "&"), ("&quot;", '"'), ("&#39;", "'"), ("&#x27;", "'"), ("&nbsp;", " "))
 
 
 def html_canon(value: str) -> str:
     """Normalize insignificant HTML differences so a reformatted but identical description hashes the same."""
     text = unicodedata.normalize("NFC", value).replace("\r\n", "\n").replace("\r", "\n").strip()
+    for entity, char in _EQUIVALENT_ENTITIES:
+        text = text.replace(entity, char)
     text = _SPACE.sub(" ", text)
     text = _BETWEEN_TAGS.sub("><", text)
 

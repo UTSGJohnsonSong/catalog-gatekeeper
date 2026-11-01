@@ -16,6 +16,21 @@ QUOTE_MAX_CHARS = 400
 PLACEHOLDERS = frozenset(
     {"tbd", "todo", "coming soon", "description here", "n/a", "test", "placeholder", "lorem ipsum"}
 )
+# Short text matching one of these is a placeholder. Longer text is a real sentence that happens to contain the words.
+PLACEHOLDER_MAX_WORDS = 8
+PLACEHOLDER_PATTERNS = (
+    r"coming soon",
+    r"\bgoes here\b",
+    r"\bdescription here\b",
+    r"\b(?:your|add|insert|enter|write)\b.*\bdescription\b",
+    r"\bto be (?:added|updated|confirmed|announced|written|determined)\b",
+    r"\bsample (?:text|copy|description)\b",
+    r"\bdummy (?:text|copy)\b",
+    r"\bplaceholder\b",
+    r"\blorem\b.*\bipsum\b",
+    r"\btbd\b",
+    r"\btodo\b",
+)
 ALLOWED_TAGS = frozenset({"p", "br", "ul", "ol", "li", "strong", "em", "b", "i", "h2", "h3", "h4"})
 VOID_TAGS = frozenset(
     {"br", "img", "hr", "input", "meta", "link", "area", "base", "col", "embed", "source", "track", "wbr"}

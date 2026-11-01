@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from decimal import Decimal
 from functools import lru_cache
@@ -10,6 +11,7 @@ from typing import Any, Literal, Protocol
 
 import yaml
 
+log = logging.getLogger("gatekeeper.llm")
 Mode = Literal["live", "demo", "test"]
 
 
@@ -42,6 +44,7 @@ class Usage:
     input_tokens: int = 0
     output_tokens: int = 0
     cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
 
 
 @dataclass(frozen=True)
@@ -70,15 +73,28 @@ def _pricing() -> dict[str, dict[str, float]]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))["models"]
 
 
-def cost_usd(model: str, usage: Usage) -> Decimal | None:
-    """None for an unknown model, in which case only the token budget applies."""
-    price = _pricing().get(model)
-    if price is None:
-        return None
-    uncached = usage.input_tokens
+def _price(rates: dict[str, float], usage: Usage) -> Decimal:
+    input_rate = Decimal(str(rates["input"]))
     total = (
-        Decimal(str(price["input"])) * uncached
-        + Decimal(str(price["output"])) * usage.output_tokens
-        + Decimal(str(price.get("cache_read", price["input"]))) * usage.cache_read_tokens
+        input_rate * usage.input_tokens
+        + Decimal(str(rates["output"])) * usage.output_tokens
+        + Decimal(str(rates.get("cache_read", rates["input"]))) * usage.cache_read_tokens
+        + input_rate * Decimal("1.25") * usage.cache_write_tokens
     )
     return total / Decimal(1_000_000)
+
+
+def cost_usd(model: str, usage: Usage) -> Decimal | None:
+    """None for a model that is not in the pricing table."""
+    rates = _pricing().get(model)
+    return None if rates is None else _price(rates, usage)
+
+
+def billable_cost(model: str, usage: Usage) -> Decimal:
+    """What budgets count. An unpriced model, such as a fallback, is charged at the highest known rate, so spend
+    can never be invisible to the caps."""
+    known = cost_usd(model, usage)
+    if known is not None:
+        return known
+    log.error("no price for model %s; charging the highest known rate", model)
+    return _price(max(_pricing().values(), key=lambda rates: rates["output"]), usage)

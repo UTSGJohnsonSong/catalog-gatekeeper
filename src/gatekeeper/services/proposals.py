@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 import psycopg
@@ -13,10 +14,11 @@ from gatekeeper.db import Conn, tx
 from gatekeeper.domain.product import ALLOWED_FIELDS, Product, proposed_hash
 from gatekeeper.domain.risk import RiskInput, risk_score
 from gatekeeper.llm.judge import JudgeResult, run_judge
+from gatekeeper.llm.port import billable_cost
 from gatekeeper.rag.citations import check_citations
 from gatekeeper.rules.spec import RULE_VERSION
 from gatekeeper.rules.text import strip_html
-from gatekeeper.rules.validators import ProposalContext, ValidatorResult, run_validators
+from gatekeeper.rules.validators import CheckedCitation, ProposalContext, ValidatorResult, run_validators
 from gatekeeper.services.catalog import product_from_row, write_audit
 
 
@@ -26,6 +28,7 @@ class ProposalOutcome:
     status: str
     failed_rules: list[dict[str, Any]]
     risk_score: int = 0
+    judge_cost_usd: Decimal = Decimal(0)
 
 
 def _proposed_text(changes: dict[str, Any]) -> str:
@@ -65,9 +68,11 @@ def create_proposal(
             is not None
         )
     results = run_validators(ProposalContext(product, changes, base_content_hash, checked))
-    blocked = [r for r in results if r.blocks]
-    judge = JudgeResult("disabled")
-    if not blocked and ctx.judge is not None:
+    if any(r.blocks for r in results):
+        judge = JudgeResult("skipped_blocked") if ctx.judge is not None else JudgeResult("disabled")
+    elif ctx.judge is None:
+        judge = JudgeResult("disabled")
+    else:
         # Outside any transaction: a slow model call must not hold a connection or a lock.
         judge = run_judge(ctx.judge, proposed_text=_proposed_text(changes), source_text=_source_text(product))
     return _persist(
@@ -90,7 +95,7 @@ def _persist(
     changes: dict[str, Any],
     rationale: str,
     citations: list[dict[str, Any]],
-    checked: tuple,
+    checked: tuple[CheckedCitation, ...],
     results: list[ValidatorResult],
     judge: JudgeResult,
     open_a13: bool,
@@ -109,13 +114,32 @@ def _persist(
         {**c, "verified": chk.ok, "reason": chk.reason} for c, chk in zip(citations, checked, strict=True)
     ]
     failed_payload = [{"id": r.rule_id, "evidence": r.evidence} for r in results if not r.passed]
+    judge_cost = billable_cost(judge.model, judge.usage) if judge.model else Decimal(0)
     try:
         with tx(ctx.pool, "agent") as conn:
+            # The judge's spend is recorded even if the insert below conflicts, so the daily cap still sees it.
+            if run_id and judge.model:
+                conn.execute(
+                    "INSERT INTO llm_calls (run_id, iteration, role, model, stop_reason, input_tokens, output_tokens, "
+                    "cache_read_tokens, cost_usd, latency_ms) VALUES (%s,0,'judge',%s,%s,%s,%s,%s,%s,%s)",
+                    (
+                        run_id,
+                        judge.model,
+                        judge.stop_reason,
+                        judge.usage.input_tokens,
+                        judge.usage.output_tokens,
+                        judge.usage.cache_read_tokens,
+                        judge_cost,
+                        judge.latency_ms,
+                    ),
+                )
+                conn.commit()
             row = conn.execute(
                 """
                 INSERT INTO proposals (shop_id, product_id, run_id, base_content_hash, proposed, proposed_hash,
-                                       rationale, citations, status, risk_score, risk_reasons)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
+                                       rationale, citations, status, risk_score, risk_reasons,
+                                       judge_status, judge_discarded)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
                 """,
                 (
                     shop_id,
@@ -129,6 +153,8 @@ def _persist(
                     status,
                     score,
                     Jsonb(reasons),
+                    judge.status,
+                    judge.unverified,
                 ),
             ).fetchone()
             proposal_id = str(row["id"])
@@ -151,15 +177,19 @@ def _persist(
     except psycopg.errors.UniqueViolation as exc:
         name = exc.diag.constraint_name or ""
         if name == "one_open_proposal_per_product":
-            return ProposalOutcome(None, "conflict_open_proposal", [{"id": "one_open_proposal_per_product"}])
-        if "proposed_hash" in name or "base_content" in name:
-            return ProposalOutcome(None, "duplicate", [{"id": "same fix already proposed for this base"}])
+            return ProposalOutcome(
+                None, "conflict_open_proposal", [{"id": "one_open_proposal_per_product"}], judge_cost_usd=judge_cost
+            )
+        if name == "one_decided_fix_per_base":
+            return ProposalOutcome(
+                None, "duplicate", [{"id": "same fix already proposed for this base"}], judge_cost_usd=judge_cost
+            )
         raise
-    return ProposalOutcome(proposal_id, status, failed_payload, score)
+    return ProposalOutcome(proposal_id, status, failed_payload, score, judge_cost)
 
 
 def _persist_judge(conn: Conn, proposal_id: str, judge: JudgeResult) -> None:
-    if judge.status == "disabled":
+    if judge.status in ("disabled", "skipped_blocked"):
         return
     if judge.status == "unavailable":
         conn.execute(

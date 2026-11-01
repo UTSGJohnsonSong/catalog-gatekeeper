@@ -4,4 +4,6 @@ DROP TABLE IF EXISTS heartbeats, jobs, webhook_events, writebacks, reviews, vali
   policy_docs, findings, products, shops CASCADE;
 DROP FUNCTION IF EXISTS proposals_guard();
 DROP FUNCTION IF EXISTS raise_immutable();
+DROP SCHEMA IF EXISTS fixture CASCADE;
+DROP VIEW IF EXISTS v_policy_search, v_embedder_state;
 DROP TYPE IF EXISTS job_status, run_status, finding_status, rule_severity, audit_severity, proposal_status;

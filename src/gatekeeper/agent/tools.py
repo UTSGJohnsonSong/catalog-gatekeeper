@@ -6,9 +6,9 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError
 
 from gatekeeper.agent.budget import Budget, BudgetExceeded
 from gatekeeper.agent.fence import fence, sanitize
@@ -90,37 +90,51 @@ TOOL_SPECS = [
 ]
 
 
+def _storable(value: str) -> str:
+    """A hijacked model can send text Postgres or the hash cannot hold. It gets a tool error, not a crashed run."""
+    if "\x00" in value:
+        raise ValueError("must not contain NUL characters")
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise ValueError("must be valid Unicode") from exc
+    return value
+
+
+SafeStr = Annotated[str, AfterValidator(_storable)]
+
+
 class SearchInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    query: str = Field(min_length=1)
+    query: SafeStr = Field(min_length=1)
     k: int = 3
 
 
 class Changes(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    description_html: str | None = None
-    seo_title: str | None = None
-    seo_description: str | None = None
+    description_html: SafeStr | None = None
+    seo_title: SafeStr | None = None
+    seo_description: SafeStr | None = None
 
 
 class CitationInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    doc_id: str
-    chunk_id: str
-    quote: str
+    doc_id: SafeStr
+    chunk_id: SafeStr
+    quote: SafeStr
 
 
 class ProposeInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     changes: Changes
-    rationale: str = Field(max_length=2000)
+    rationale: SafeStr = Field(max_length=2000)
     citations: list[CitationInput] = Field(default_factory=list, max_length=10)
 
 
 class FinishInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     outcome: str
-    summary: str = Field(max_length=2000)
+    summary: SafeStr = Field(max_length=2000)
     flags: list[str] = Field(default_factory=list)
 
 
@@ -146,7 +160,6 @@ class RunState:
     product_id: int
     base_content_hash: str
     nonce: str
-    truncated: set[str] = field(default_factory=set)
     proposal_ids: list[str] = field(default_factory=list)
     flags: set[str] = field(default_factory=set)
 
@@ -193,6 +206,7 @@ class Toolbox:
         product = self._load_product()
         nonce = self.state.nonce
         fields: dict[str, str] = {}
+        truncated: set[str] = set()
         sanitized = False
         for name, value in (
             ("title", product.title),
@@ -204,8 +218,7 @@ class Toolbox:
             ("seo_description", product.seo_description),
         ):
             if len(value) > MAX_FIELD_CHARS:
-                # Editing a field the model saw only partly would silently drop text, so propose_fix refuses it.
-                self.state.truncated.add("description_html" if name == "description_text" else name)
+                truncated.add("description_html" if name == "description_text" else name)
                 value = value[:MAX_FIELD_CHARS]
             sanitized = sanitized or sanitize(value)[1]
             fields[name] = fence(name, value, nonce)
@@ -218,9 +231,9 @@ class Toolbox:
                     "tags": [fence("tag", t, nonce) for t in product.tags[:50]],
                     "variants": [
                         {
-                            "sku": sanitize(v.get("sku", ""))[0],
+                            "sku": fence("sku", str(v.get("sku", "")), nonce),
                             "price": v.get("price"),
-                            "options": [sanitize(str(o))[0] for o in v.get("options", [])],
+                            "options": [fence("option", str(o), nonce) for o in v.get("options", [])],
                         }
                         for v in product.variants[:50]
                     ],
@@ -228,7 +241,7 @@ class Toolbox:
                         {"id": i.get("id"), "has_alt": bool((i.get("alt") or "").strip())} for i in product.images[:20]
                     ],
                     "metafields": {k: fence(k, str(v), nonce) for k, v in product.metafields.items()},
-                    "truncated_fields": sorted(self.state.truncated),
+                    "truncated_fields": sorted(truncated),
                     "sanitized": sanitized,
                 },
                 ensure_ascii=False,
@@ -275,9 +288,14 @@ class Toolbox:
             raise BudgetExceeded(f"propose_fix limit {self.budget.max_propose_calls}", "max_iterations")
         self.budget.propose_calls += 1
         changes = parsed.changes.model_dump(exclude_none=True)
-        partly_read = sorted(set(changes) & self.state.truncated)
+        # Measured here rather than remembered from get_product, so skipping the read cannot skip this check.
+        # Rewriting a field the model could only see part of would silently drop the rest.
+        product = self._load_product()
+        partly_read = sorted(name for name in changes if len(getattr(product, name)) > MAX_FIELD_CHARS)
         if partly_read:
-            raise ToolInputError(f"Refused: you only saw part of {', '.join(partly_read)}, so it cannot be rewritten.")
+            raise ToolInputError(
+                f"Refused: {', '.join(partly_read)} is too long to read in full, so it cannot be rewritten."
+            )
         outcome = create_proposal(
             self.ctx,
             product_id=self.state.product_id,
@@ -287,6 +305,7 @@ class Toolbox:
             rationale=parsed.rationale,
             citations=[c.model_dump() for c in parsed.citations],
         )
+        self.budget.cost_usd += outcome.judge_cost_usd
         if outcome.id:
             self.state.proposal_ids.append(outcome.id)
         return ToolResult(

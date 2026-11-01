@@ -33,7 +33,6 @@ def ingest_directory(pool: ConnectionPool[Conn], policy_dir: Path, embedder: Emb
     chunks = [c for doc_id, _, body in docs for c in chunk_document(doc_id, body)]
     embedder.fit([c.text for c in chunks])
     with pool.connection() as conn:
-        conn.execute("DELETE FROM policy_docs WHERE id <> ALL(%s)", ([d[0] for d in docs],))
         for doc_id, title, body in docs:
             conn.execute(
                 "INSERT INTO policy_docs (id, title, body, doc_hash) VALUES (%s, %s, %s, %s) "
@@ -41,14 +40,13 @@ def ingest_directory(pool: ConnectionPool[Conn], policy_dir: Path, embedder: Emb
                 (doc_id, title, body, hashlib.sha256(body.encode("utf-8")).hexdigest()),
             )
         ids = [c.id for c in chunks]
-        conn.execute(
-            "DELETE FROM policy_chunks WHERE id <> ALL(%s) AND id NOT IN (SELECT chunk_id FROM run_retrievals)", (ids,)
-        )
+        # Retired, not deleted: run_retrievals keeps pointing at them, and search and citations ignore them.
+        conn.execute("UPDATE policy_chunks SET retired_at = now() WHERE id <> ALL(%s) AND retired_at IS NULL", (ids,))
         for chunk in chunks:
             conn.execute(
                 "INSERT INTO policy_chunks (id, doc_id, ordinal, text, embedder_id, embedding) VALUES (%s,%s,%s,%s,%s,%s) "
                 "ON CONFLICT (id) DO UPDATE SET text = EXCLUDED.text, embedder_id = EXCLUDED.embedder_id, "
-                "embedding = EXCLUDED.embedding",
+                "embedding = EXCLUDED.embedding, retired_at = NULL",
                 (chunk.id, chunk.doc_id, chunk.ordinal, chunk.text, embedder.id, Vector(embedder.embed(chunk.text))),
             )
         conn.execute(
@@ -70,10 +68,14 @@ def load_embedder(pool: ConnectionPool[Conn]) -> HashingTfidfEmbedder:
 
 
 def search(conn: Conn, embedder: Embedder, query: str, k: int = 5) -> list[SearchHit]:
-    vector = Vector(embedder.embed(query))
+    embedded = embedder.embed(query)
+    if not any(embedded):
+        # A query of only stopwords has no direction, so any ranking would be arbitrary.
+        return []
+    vector = Vector(embedded)
     rows = conn.execute(
         "SELECT id, doc_id, text, 1 - (embedding <=> %s) AS score FROM policy_chunks "
-        "WHERE embedder_id = %s ORDER BY embedding <=> %s, id LIMIT %s",
+        "WHERE embedder_id = %s AND retired_at IS NULL ORDER BY embedding <=> %s, id LIMIT %s",
         (vector, embedder.id, vector, k),
     ).fetchall()
     return [SearchHit(r["doc_id"], r["id"], r["text"], float(r["score"] or 0.0)) for r in rows]

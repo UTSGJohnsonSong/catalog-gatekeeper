@@ -6,8 +6,10 @@ import { ActivityPage, LoginPage, ProductsPage } from "./pages/Other";
 import { ProposalPage } from "./pages/Proposal";
 import { QueuePage } from "./pages/Queue";
 
-function ModeBanner() {
-  const { data: meta } = useQuery({ queryKey: ["meta"], queryFn: api.meta });
+export function ModeBanner() {
+  const { data: meta, isError } = useQuery({ queryKey: ["meta"], queryFn: api.meta, refetchInterval: 15000 });
+  // No banner must not look like live mode: an unknown mode is said out loud.
+  if (isError) return <p className="mode-banner">Could not confirm which model and store this is using.</p>;
   if (!meta) return null;
   const notes: string[] = [];
   if (meta.model_mode === "demo") notes.push("Demo model: fixes come from a template script, not an LLM.");

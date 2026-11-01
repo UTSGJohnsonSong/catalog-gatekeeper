@@ -1,0 +1,33 @@
+{"gold_chunk_ids":["returns#000"],"id":"q01","question":"How many days do I have to return unworn items?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["returns#001"],"id":"q04","question":"Can final sale items be returned?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["shipping#000"],"id":"q09","question":"How long does standard delivery take in Canada?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["shipping#001"],"id":"q10","question":"Is standard shipping free on Canadian orders?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["shipping#002"],"id":"q12","question":"What happens if a parcel is lost in transit?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["warranty#001"],"id":"q18","question":"What is the warranty on tents and sleeping bags?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["care-and-materials#000"],"id":"q23","question":"How much do cotton garments shrink in the first wash?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["care-and-materials#001"],"id":"q25","question":"Can insulated bottles go in the dishwasher?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["care-and-materials#002"],"id":"q26","question":"How do I reactivate the water-repellent finish on a waterproof jacket?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["care-and-materials#002"],"id":"q27","question":"What does recycled polyester mean in your material claims?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["care-and-materials#003"],"id":"q28","question":"How should knitwear be stored?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["sizing#000"],"id":"q29","question":"Which sizes do tops and jackets follow?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["sizing#000"],"id":"q30","question":"How do I measure the chest?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["sizing#001"],"id":"q31","question":"Are half sizes available in footwear?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["sizing#001"],"id":"q32","question":"Do kids sizes run large?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["sizing#002"],"id":"q33","question":"How is bag capacity measured?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["sizing#002"],"id":"q34","question":"How is bottle volume measured?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["shipping#000"],"id":"q35","question":"Which countries do you not ship to?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["care-and-materials#001"],"id":"q40","question":"How should I dry an insulated bottle?","split":"test","subset":"lexical"}
+{"gold_chunk_ids":["returns#002"],"id":"p04","question":"My sneakers got scuffed outside, can they still come back?","split":"test","subset":"paraphrase"}
+{"gold_chunk_ids":["returns#003"],"id":"p05","question":"It showed up broken, what now?","split":"test","subset":"paraphrase"}
+{"gold_chunk_ids":["shipping#001"],"id":"p07","question":"Is there a minimum spend to avoid paying for postage?","split":"test","subset":"paraphrase"}
+{"gold_chunk_ids":["shipping#002"],"id":"p08","question":"My box never turned up.","split":"test","subset":"paraphrase"}
+{"gold_chunk_ids":["shipping#002"],"id":"p09","question":"Will customs charge me extra in Texas?","split":"test","subset":"paraphrase"}
+{"gold_chunk_ids":["warranty#000"],"id":"p10","question":"What happens if the backpack strap buckle snaps?","split":"test","subset":"paraphrase"}
+{"gold_chunk_ids":["warranty#002"],"id":"p12","question":"The sole of my boot is peeling off.","split":"test","subset":"paraphrase"}
+{"gold_chunk_ids":["sizing#001"],"id":"p19","question":"Should I buy bigger clothes for my growing child?","split":"test","subset":"paraphrase"}
+{"gold_chunk_ids":[],"id":"u02","question":"Can I pay with cryptocurrency?","split":"test","subset":"unanswerable"}
+{"gold_chunk_ids":[],"id":"u05","question":"Do you ship to Germany by sea freight?","split":"test","subset":"unanswerable"}
+{"gold_chunk_ids":[],"id":"u07","question":"Can I reserve an item for pickup?","split":"test","subset":"unanswerable"}
+{"gold_chunk_ids":[],"id":"u08","question":"Do you offer gift wrapping?","split":"test","subset":"unanswerable"}
+{"gold_chunk_ids":[],"id":"u09","question":"How do I join the loyalty programme?","split":"test","subset":"unanswerable"}
+{"gold_chunk_ids":[],"id":"u10","question":"Can I change my order after payment?","split":"test","subset":"unanswerable"}

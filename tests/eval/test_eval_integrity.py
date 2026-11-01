@@ -25,7 +25,7 @@ from gatekeeper_eval.metrics import (
     score_rules,
     wilson,
 )
-from gatekeeper_eval.runner import run_agent_live
+from gatekeeper_eval.runner import run_agent_live, run_audit, run_citations, run_validators_suite
 
 GENERATOR = Path(base_products.__file__).parent
 ROOT = Path(__file__).resolve().parents[2]
@@ -39,6 +39,8 @@ def test_generator_never_imports_the_rules_it_labels():
                 names = [alias.name for alias in node.names]
             elif isinstance(node, ast.ImportFrom):
                 names = [node.module or ""]
+                if node.module == "gatekeeper":
+                    names += [f"gatekeeper.{alias.name}" for alias in node.names]
             for name in names:
                 assert not name.startswith("gatekeeper.rules"), f"{path.name} imports {name}"
 
@@ -142,8 +144,11 @@ class TestHonesty:
                 "every_applied_matches_approved_hash": True,
                 "every_applied_verified_in_store": True,
                 "every_run_finished": True,
+                "every_approved_reached_a_verified_outcome": True,
             },
             "agent_metrics": {"accuracy": 1.0},
+            "products_with_fixable_findings": 1,
+            "applied": 1,
         }
         assert gates.judge(report) == ["a plumbing report must not carry agent metrics"]
 
@@ -155,3 +160,109 @@ class TestHonesty:
         data = yaml.safe_load((ROOT / "eval/gates.yaml").read_text(encoding="utf-8"))
         assert data["dev"]["validators"]["false_block_rate"] <= 0.02
         assert data["dev"]["audit"]["per_rule_recall"] >= 0.90
+
+
+class TestTheGateCanFail:
+    """Negative controls: if a broken rule set still passes, the gate means nothing."""
+
+    def test_audit_gate_fails_when_rules_find_nothing(self, monkeypatch):
+        monkeypatch.setattr("gatekeeper_eval.runner.audit_product", lambda *a, **k: [])
+        report = run_audit("dev", show_cases=False)
+        assert report["micro"]["recall"] == 0 and gates.judge(report)
+
+    def test_audit_gate_fails_when_rules_fire_on_everything(self, monkeypatch):
+        from gatekeeper.rules.audit import Finding
+        from gatekeeper.rules.spec import AUDIT_RULES
+
+        monkeypatch.setattr("gatekeeper_eval.runner.audit_product", lambda *a, **k: [Finding(r) for r in AUDIT_RULES])
+        report = run_audit("dev", show_cases=False)
+        assert report["micro"]["precision"] < 0.5 and gates.judge(report)
+
+    def test_validator_gate_fails_when_validators_pass_everything(self, monkeypatch):
+        monkeypatch.setattr("gatekeeper_eval.runner.run_validators", lambda ctx: [])
+        report = run_validators_suite("dev", show_cases=False)
+        assert gates.judge(report)
+
+    def test_validator_gate_fails_when_validators_block_everything(self, monkeypatch):
+        from gatekeeper.rules.spec import VALIDATORS
+        from gatekeeper.rules.validators import ValidatorResult
+
+        monkeypatch.setattr(
+            "gatekeeper_eval.runner.run_validators", lambda ctx: [ValidatorResult(r, False) for r in VALIDATORS]
+        )
+        report = run_validators_suite("dev", show_cases=False)
+        assert report["false_block"]["rate"] == 1 and gates.judge(report)
+
+    def test_citation_gate_fails_when_the_checker_accepts_everything(self, monkeypatch):
+        from gatekeeper.rules.validators import CheckedCitation
+
+        monkeypatch.setattr(
+            "gatekeeper_eval.runner.check_citation_against", lambda c, ch, r: CheckedCitation("q", True)
+        )
+        assert gates.judge(run_citations("dev", show_cases=False))
+
+    def test_unknown_suite_fails(self):
+        assert gates.judge({"suite": "made-up", "split": "dev"})
+
+    def test_e2e_that_processed_nothing_fails(self):
+        invariants = dict.fromkeys(
+            yaml.safe_load((ROOT / "eval/gates.yaml").read_text(encoding="utf-8"))["e2e"]["must_hold"], True
+        )
+        report = {
+            "suite": "e2e",
+            "split": "fixture",
+            "invariants": invariants,
+            "products_with_fixable_findings": 0,
+            "applied": 0,
+            "agent_metrics": None,
+        }
+        assert gates.judge(report)
+
+    def test_test_split_report_fails_unless_the_split_is_frozen(self):
+        report = {
+            "suite": "citations",
+            "split": "test",
+            "rejection_recall": 1.0,
+            "false_reject_rate": 0.0,
+            "frozen_test_split_intact": False,
+        }
+        assert any("frozen" in failure for failure in gates.judge(report))
+
+
+def test_committed_test_split_matches_its_frozen_hash():
+    assert freezer.is_frozen_intact(), "the test split changed; a change must become a new dataset version"
+    assert all(p.exists() for p in freezer.test_files())
+
+
+def test_the_build_is_reproducible_byte_for_byte(tmp_path, monkeypatch):
+    from gatekeeper_eval.generator import build
+
+    monkeypatch.setattr(build, "OUT", tmp_path)
+    build.build_all()
+    for path in tmp_path.glob("*.jsonl"):
+        assert path.read_bytes() == (OUT / path.name).read_bytes(), path.name
+
+
+def test_test_split_reports_hide_individual_cases():
+    report = run_audit("test", show_cases=False)
+    assert isinstance(report["misses"], str) and "test-" not in json.dumps(report["misses"])
+
+
+def test_every_case_file_is_synthetic_or_has_no_real_source():
+    for path in OUT.glob("audit_*.jsonl"):
+        with path.open(encoding="utf-8") as handle:
+            assert all(json.loads(line)["origin"] == "synthetic" for line in handle)
+    for path in OUT.glob("proposals_*.jsonl"):
+        with path.open(encoding="utf-8") as handle:
+            assert all(json.loads(line)["origin"] == "synthetic" for line in handle)
+
+
+def test_skipped_agent_report_is_saved_without_a_pass(monkeypatch, tmp_path):
+    import gatekeeper_eval.__main__ as cli
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(cli, "REPORTS", tmp_path)
+    monkeypatch.setattr("sys.argv", ["gatekeeper_eval", "agent", "--split", "dev"])
+    assert cli.main() == 0
+    saved = json.loads(next(tmp_path.glob("agent-*.json")).read_text(encoding="utf-8"))
+    assert saved["gate"] == "SKIPPED" and saved["agent_metrics"] is None

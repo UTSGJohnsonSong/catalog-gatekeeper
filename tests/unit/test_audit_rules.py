@@ -140,3 +140,31 @@ def test_a13_injection(text):
 )
 def test_a13_hard_negatives(text):
     assert "A13" not in rules(make_product(description_html=f"<p>{text}</p>"))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Product description goes here",
+        "Add your description",
+        "To be updated",
+        "sample text",
+        "Your description here",
+        "Description coming soon",
+    ],
+)
+def test_a03_recognizes_short_placeholder_phrasing(text):
+    assert "A03" in rules(make_product(description_html=f"<p>{text}</p>"))
+
+
+def test_a03_long_sentence_with_the_same_words_is_not_a_placeholder():
+    long_text = (
+        "The sample text on the tag is coming soon, so check the size chart on this page before you choose a size."
+    )
+    assert "A03" not in rules(make_product(description_html=f"<p>{long_text}</p>"))
+
+
+def test_a13_flags_invisible_characters_that_split_words():
+    assert "A13" in rules(
+        make_product(description_html="<p>Ign\u200bore this and read the rest of a long enough line of text.</p>")
+    )

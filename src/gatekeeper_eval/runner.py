@@ -1,4 +1,4 @@
-"""Suite runners. Each returns a plain dict that report.py writes and gates.py judges."""
+"""Suite runners. Each returns a plain dict that __main__ saves and gates.py judges."""
 
 from __future__ import annotations
 
@@ -268,6 +268,7 @@ def run_e2e() -> dict[str, Any]:
             "every_applied_matches_approved_hash": True,
             "every_applied_verified_in_store": True,
             "every_run_finished": True,
+            "every_approved_reached_a_verified_outcome": True,
         }
         approved_attempted_on_blocked = 0
         applied = 0
@@ -303,6 +304,8 @@ def run_e2e() -> dict[str, Any]:
                     wb = conn.execute(
                         "SELECT expected_after_hash FROM writebacks WHERE proposal_id = %s", (proposal_id,)
                     ).fetchone()
+                if outcome.status != "applied":
+                    invariants["every_approved_reached_a_verified_outcome"] = False
                 if outcome.status == "applied":
                     applied += 1
                     expected = approval_hash(
@@ -372,6 +375,7 @@ def run_agent_live(split: str) -> dict[str, Any]:
     embedder = HashingTfidfEmbedder()
     ingest_directory(pool, POLICIES, embedder)
     settings = Settings(env="test", database_url=url, llm_provider="anthropic", anthropic_api_key=key, demo_mode=False)
+    run_failures: list[str] = []
     provider, judge = build_provider(settings)
     shop_id = ensure_shop(pool, settings.shopify_shop_domain)
     store = FixtureShopify(pool)
@@ -388,7 +392,10 @@ def run_agent_live(split: str) -> dict[str, Any]:
         with pool.connection() as conn:
             ids = [r["id"] for r in conn.execute("SELECT id FROM products ORDER BY id").fetchall()]
         for product_id in ids:
-            run_agent(ctx, product_id)
+            try:
+                run_agent(ctx, product_id)
+            except Exception as exc:  # noqa: BLE001 - the run row records it; one bad run must not end the sweep
+                run_failures.append(f"{product_id}: {type(exc).__name__}")
         with pool.connection() as conn:
             runs = conn.execute(
                 "SELECT status::text AS status, cost_usd, input_tokens, output_tokens, flags, extract(epoch FROM finished_at - started_at) AS seconds FROM agent_runs"
@@ -407,6 +414,7 @@ def run_agent_live(split: str) -> dict[str, Any]:
         "agent_metrics": {
             "runs": len(runs),
             "run_statuses": dict(Counter(r["status"] for r in runs)),
+            "runs_that_raised": run_failures,
             "proposal_statuses": dict(Counter(p["status"] for p in proposals)),
             "citation_faithfulness": {
                 "verified": sum(1 for c in citations if c.get("verified")),

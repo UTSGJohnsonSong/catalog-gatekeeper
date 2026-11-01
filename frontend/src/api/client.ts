@@ -9,6 +9,7 @@ export type FieldDiff = components["schemas"]["FieldDiff"];
 export type ProductOut = components["schemas"]["ProductOut"];
 export type AuditEntry = components["schemas"]["AuditEntry"];
 export type Whoami = components["schemas"]["Whoami"];
+export type Ops = components["schemas"]["Ops"];
 
 const TOKEN_KEY = "gatekeeper.token";
 let memoryToken: string | null = null;
@@ -67,6 +68,7 @@ export const api = {
   meta: () => request<Meta>("/api/meta"),
   whoami: () => request<Whoami>("/api/whoami"),
   queue: () => request<Queue>("/api/queue"),
+  ops: () => request<Ops>("/api/ops"),
   proposal: (id: string) => request<ProposalDetail>(`/api/proposals/${id}`),
   approve: (id: string, reviewHash: string, confirmHighRisk: boolean) =>
     request(`/api/proposals/${id}/approve`, {

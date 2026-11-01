@@ -17,13 +17,16 @@ RESOURCES = Path(__file__).resolve().parents[1] / "resources"
 
 _SPACE = re.compile(r"\s+")
 _QUOTES = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"', "–": "-", "—": "-", "−": "-"})
-# Bidi overrides and isolates, plus Unicode tag characters. ZWJ and ZWNJ are legitimate in text and emoji.
-HIDDEN_CHARS = re.compile("[‪-‮⁦-⁩\U000e0000-\U000e007f]")
+# Bidi overrides and isolates, Unicode tag characters, and invisible characters that can split a word to dodge a
+# lexicon. ZWJ and ZWNJ stay: they are legitimate in emoji and in some scripts.
+HIDDEN_CHARS = re.compile("[\u00ad\u200b\u2060\ufeff\u202a-\u202e\u2066-\u2069\U000e0000-\U000e007f]")
 
 
 def norm(text: str) -> str:
     """NFKC, casefold, unify quotes and dashes, collapse whitespace. Deliberately no stemming or reordering."""
-    return _SPACE.sub(" ", unicodedata.normalize("NFKC", text).translate(_QUOTES).casefold()).strip()
+    return _SPACE.sub(
+        " ", unicodedata.normalize("NFKC", HIDDEN_CHARS.sub("", text)).translate(_QUOTES).casefold()
+    ).strip()
 
 
 class _VisibleText(HTMLParser):
@@ -96,6 +99,23 @@ def audit_tags(html: str) -> _TagAudit:
     return parser
 
 
+_TAG_TOKEN = re.compile(r"</?[A-Za-z][A-Za-z0-9]*(?:\s[^<>]*)?/?>")
+
+
+def unsafe_markup(html: str) -> list[str]:
+    """Markup a browser may read differently from Python's lenient parser. Comments, CDATA, processing
+    instructions and unterminated tags are refused outright, because the two parsers disagree about where they end,
+    and that gap lets executable markup past the tag check. Text that needs a literal < must write &lt;."""
+    problems: list[str] = []
+    if "<!" in html:
+        problems.append("comment or declaration")
+    if "<?" in html:
+        problems.append("processing instruction")
+    if "<" in _TAG_TOKEN.sub("", html):
+        problems.append("unterminated or malformed tag")
+    return problems
+
+
 _UNITS = {
     "kg": "kg",
     "kgs": "kg",
@@ -158,6 +178,18 @@ _UNITS = {
     "month": "month",
     "months": "month",
     "hour": "hour",
+    "mg": "mg",
+    "gb": "gb",
+    "mb": "mb",
+    "tb": "tb",
+    "hz": "hz",
+    "ghz": "ghz",
+    "kw": "kw",
+    "kwh": "kwh",
+    "ah": "ah",
+    "gsm": "gsm",
+    "lumen": "lumen",
+    "lumens": "lumen",
     "hours": "hour",
     "pack": "pack",
     "piece": "piece",
@@ -182,16 +214,22 @@ def numbers_with_units(text: str) -> set[tuple[str, str | None]]:
     """Numeric facts in text, as (canonical number, canonical unit or None). Words that are not units are ignored."""
     found: set[tuple[str, str | None]] = set()
     for match in _NUMBER.finditer(unicodedata.normalize("NFKC", text)):
-        raw_unit = (match.group(2) or "").lower()
-        found.add((canonical_number(match.group(1)), _UNITS.get(raw_unit)))
+        raw_number, raw_unit = match.group(1), (match.group(2) or "").lower()
+        # "$" is a unit, so "$20" is not supported by a source that only says "20 oz".
+        unit = "$" if raw_number.startswith("$") else _UNITS.get(raw_unit)
+        found.add((canonical_number(raw_number), unit))
     return found
 
 
 _MODEL_TOKEN = re.compile(r"\b(?=[A-Za-z0-9-]*[A-Za-z])(?=[A-Za-z0-9-]*\d)[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*\b")
 
 
+_NUMBER_WITH_SUFFIX = re.compile(r"\d+(?:\.\d+)?[A-Za-z%]+")
+
+
 def model_tokens(text: str) -> set[str]:
-    return {t.casefold() for t in _MODEL_TOKEN.findall(text)}
+    # "500ml" is a number with a unit, which numbers_with_units already tracks; "500 ml" must not count as losing it.
+    return {t.casefold() for t in _MODEL_TOKEN.findall(text) if not _NUMBER_WITH_SUFFIX.fullmatch(t)}
 
 
 @lru_cache

@@ -4,6 +4,7 @@ Delivery order therefore does not matter, and a forged or replayed payload canno
 from __future__ import annotations
 
 import json
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
@@ -14,13 +15,25 @@ from gatekeeper.db import tx
 from gatekeeper.domain.product import content_hash
 from gatekeeper.services.catalog import (
     active_title_counts,
+    mark_deleted,
     refresh_findings,
     stale_open_proposals,
     upsert_product,
 )
 
+log = logging.getLogger("gatekeeper.webhooks")
 HANDLED_TOPICS = {"products/update", "products/create", "products/delete"}
 ACTOR = "webhook"
+
+
+def _parse_time(value: str | None) -> datetime | None:
+    """The header is outside the signature and is informational, so a bad value is dropped, not a 500."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 def record_event(
@@ -43,7 +56,7 @@ def record_event(
         row = conn.execute(
             "INSERT INTO webhook_events (webhook_id, event_id, shop_domain, topic, triggered_at, payload, status) "
             "VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (webhook_id) DO NOTHING RETURNING id",
-            (webhook_id, event_id, shop_domain, topic, triggered_at, Jsonb(payload), status),
+            (webhook_id, event_id, shop_domain, topic, _parse_time(triggered_at), Jsonb(payload), status),
         ).fetchone()
         if row is None:
             return "duplicate"
@@ -56,7 +69,9 @@ def record_event(
     return "accepted"
 
 
-def _gid_from_payload(payload: dict[str, Any]) -> str | None:
+def _gid_from_payload(payload: Any) -> str | None:
+    if not isinstance(payload, dict):
+        return None
     gid = payload.get("admin_graphql_api_id")
     if isinstance(gid, str) and gid.startswith("gid://shopify/Product/"):
         return gid
@@ -73,15 +88,15 @@ def process_event(ctx: AppContext, event_row_id: int) -> str:
         raise KeyError(event_row_id)
     gid = _gid_from_payload(event["payload"])
     if gid is None:
+        log.warning("signed webhook names no product", extra={"webhook_id": event_row_id})
         _mark(ctx, event_row_id, "failed", "payload has no product id")
         return "failed"
     current = ctx.shopify.get_product(gid)
     with tx(ctx.pool, ACTOR) as conn:
         if current is None:
-            conn.execute("UPDATE products SET deleted_at = now() WHERE shop_id = %s AND gid = %s", (ctx.shop_id, gid))
             row = conn.execute("SELECT id FROM products WHERE shop_id = %s AND gid = %s", (ctx.shop_id, gid)).fetchone()
             if row:
-                stale_open_proposals(conn, row["id"], current_hash=None)
+                mark_deleted(conn, row["id"])
         else:
             result = upsert_product(conn, ctx.shop_id, current)
             if result.product_id is not None and result.changed:

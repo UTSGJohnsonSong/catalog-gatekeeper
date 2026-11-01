@@ -89,6 +89,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ops */
+        get: operations["ops_api_ops_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/products": {
         parameters: {
             query?: never;
@@ -374,6 +391,22 @@ export interface components {
             /** Writeback Shop Enabled */
             writeback_shop_enabled: boolean;
         };
+        /**
+         * Ops
+         * @description What needs a person. Zero everywhere means nothing is known to be wrong.
+         */
+        Ops: {
+            /** Dead Jobs */
+            dead_jobs: number;
+            /** Failed Runs Today */
+            failed_runs_today: number;
+            /** Failed Writes */
+            failed_writes: number;
+            /** Stuck Writes */
+            stuck_writes: number;
+            /** Webhooks Failed Today */
+            webhooks_failed_today: number;
+        };
         /** ProductOut */
         ProductOut: {
             /** Content Hash */
@@ -416,6 +449,8 @@ export interface components {
             findings: components["schemas"]["FindingOut"][];
             /** Id */
             id: string;
+            /** Judge Discarded */
+            judge_discarded: number;
             /** Judge Status */
             judge_status: string;
             /** Model */
@@ -444,6 +479,10 @@ export interface components {
             status: string;
             /** Validation */
             validation: components["schemas"]["ValidationRow"][];
+            /** Writeback Errors */
+            writeback_errors: {
+                [key: string]: unknown;
+            }[];
             /** Writeback Status */
             writeback_status: string | null;
         };
@@ -697,6 +736,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Meta"];
+                };
+            };
+        };
+    };
+    ops_api_ops_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ops"];
                 };
             };
         };

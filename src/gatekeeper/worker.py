@@ -1,4 +1,4 @@
-"""Background worker. Exceptions become job retries; nothing is swallowed without a log line and a last_error."""
+"""Background worker. A job that fails is retried or goes dead with last_error set, and it is logged."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import logging
 import os
 import socket
 import sys
+import threading
 import time
 from datetime import UTC, datetime, timedelta
 
@@ -22,12 +23,13 @@ from gatekeeper.services.writeback import apply_proposal
 from gatekeeper.shopify.port import ShopifyAuthError, ShopifyError, ShopifyThrottled
 
 log = logging.getLogger("gatekeeper.worker")
-TICK_SECONDS = 60
+TICK_SECONDS = 15
+HEARTBEAT_SECONDS = 15
 RECONCILE_SECONDS = 3600
 
 
 class JsonFormatter(logging.Formatter):
-    """Structured logs. Tokens and product text are never passed to the logger."""
+    """Structured logs. Call sites pass ids and error text, never tokens or product text."""
 
     def format(self, record: logging.LogRecord) -> str:
         data = {
@@ -56,18 +58,30 @@ def run_job(ctx: AppContext, job: dict) -> None:
     try:
         if kind == "apply_writeback":
             result = apply_proposal(ctx, payload["proposal_id"])
-            log.info("apply finished: %s", result.status, extra={**extra, "proposal_id": payload["proposal_id"]})
+            log.info(
+                "apply finished: %s %s",
+                result.status,
+                result.detail,
+                extra={**extra, "proposal_id": payload["proposal_id"]},
+            )
             if result.status in ("deferred", "in_progress"):
                 jobs.defer(ctx.pool, job_id, 60 if result.status == "deferred" else 10, result.detail)
                 return
         elif kind == "agent_run":
-            result_run = run_agent(ctx, payload["product_id"])
-            log.info("agent run finished: %s", result_run.status, extra={**extra, "run_id": result_run.run_id})
+            run = run_agent(ctx, payload["product_id"])
+            if run.status != "finished":
+                # Budget, truncation and refusal endings are not worth retrying, but they must not look done.
+                log.error("agent run ended as %s: %s", run.status, run.error, extra={**extra, "run_id": run.run_id})
+                jobs.fail(ctx.pool, job, f"run {run.run_id} ended as {run.status}: {run.error}", retryable=False)
+                return
+            log.info("agent run finished: %s", run.outcome, extra={**extra, "run_id": run.run_id})
         elif kind == "sync":
             since = datetime.fromisoformat(payload["updated_since"]) if payload.get("updated_since") else None
             log.info("sync finished: %s", sync_catalog(ctx, updated_since=since), extra=extra)
         elif kind == "process_webhook":
-            process_event(ctx, payload["event_row_id"])
+            if process_event(ctx, payload["event_row_id"]) == "failed":
+                jobs.fail(ctx.pool, job, "webhook payload names no product", retryable=False)
+                return
         else:
             raise ValueError(f"unknown job kind {kind}")
         jobs.complete(ctx.pool, job_id)
@@ -91,19 +105,32 @@ def run_job(ctx: AppContext, job: dict) -> None:
         jobs.fail(ctx.pool, job, f"{type(exc).__name__}: {exc}")
 
 
-def tick(ctx: AppContext, last_reconcile: float | None) -> float | None:
+def beat(ctx: AppContext) -> None:
     with tx(ctx.pool) as conn:
         conn.execute(
             "INSERT INTO heartbeats (name, at) VALUES ('worker', now()) ON CONFLICT (name) DO UPDATE SET at = now()"
         )
+
+
+def _heartbeat_loop(ctx: AppContext, stop: threading.Event) -> None:
+    """Runs on its own thread, so a long job does not make a healthy worker look dead."""
+    while not stop.wait(HEARTBEAT_SECONDS):
+        try:
+            beat(ctx)
+        except Exception:  # noqa: BLE001 - a missed heartbeat shows up in /readyz; the loop must keep trying
+            log.exception("heartbeat failed")
+
+
+def tick(ctx: AppContext, last_reconcile: float | None) -> float | None:
     jobs.reap(ctx.pool)
     jobs.sweep_applying(ctx.pool)
     now = time.monotonic()
     if last_reconcile is None or now - last_reconcile >= RECONCILE_SECONDS:
-        # Webhooks can be missed; an hourly incremental sync is the safety net.
-        bucket = datetime.now(UTC).strftime("%Y%m%d%H")
-        since = (datetime.now(UTC) - timedelta(hours=2)).isoformat()
-        jobs.enqueue(ctx.pool, "sync", {"updated_since": since}, dedupe_key=f"reconcile:{bucket}")
+        # Webhooks can be missed. Hourly catches missed updates, and a daily full sync also catches missed deletes.
+        current = datetime.now(UTC)
+        since = (current - timedelta(hours=2)).isoformat()
+        jobs.enqueue(ctx.pool, "sync", {"updated_since": since}, dedupe_key=f"reconcile:{current:%Y%m%d%H}")
+        jobs.enqueue(ctx.pool, "sync", {}, dedupe_key=f"full-sync:{current:%Y%m%d}")
         return now
     return last_reconcile
 
@@ -113,11 +140,15 @@ def main() -> None:
     settings = get_settings()
     ctx = build_context(settings)
     worker_id = f"{socket.gethostname()}:{os.getpid()}"
-    log.info("worker started: provider=%s mode=%s", ctx.provider.name, ctx.provider.mode)
+    log.info(
+        "worker started: provider=%s mode=%s adapter=%s", ctx.provider.name, ctx.provider.mode, settings.shopify_adapter
+    )
+    beat(ctx)
+    threading.Thread(target=_heartbeat_loop, args=(ctx, threading.Event()), daemon=True).start()
     last_tick = 0.0
     last_reconcile: float | None = None
     while True:
-        if time.monotonic() - last_tick >= min(TICK_SECONDS, 15):
+        if time.monotonic() - last_tick >= TICK_SECONDS:
             last_reconcile = tick(ctx, last_reconcile)
             last_tick = time.monotonic()
         job = jobs.claim(ctx.pool, worker_id)

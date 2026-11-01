@@ -221,7 +221,7 @@ def build_audit_cases(bases: list[dict], split: str, seed: int = 11) -> list[Cas
             }
         )
 
-    for rule, operator in OPERATORS.items():
+    for operator in OPERATORS.values():
         for i in range(POSITIVES_PER_RULE):
             base = pool[i % len(pool)]
             product = copy.deepcopy(base["product"])

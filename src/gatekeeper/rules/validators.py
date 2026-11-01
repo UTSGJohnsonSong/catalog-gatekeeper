@@ -4,6 +4,7 @@ sees all evidence. "New" means present in the proposed text and absent from the 
 from __future__ import annotations
 
 import difflib
+import html
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -12,6 +13,7 @@ from gatekeeper.domain.product import ALLOWED_FIELDS, Product, content_hash
 from gatekeeper.rules import spec
 from gatekeeper.rules.audit import is_placeholder, seo_and_description_findings
 from gatekeeper.rules.text import (
+    HIDDEN_CHARS,
     audit_tags,
     claims,
     contains_phrase,
@@ -20,6 +22,7 @@ from gatekeeper.rules.text import (
     norm,
     numbers_with_units,
     strip_html,
+    unsafe_markup,
 )
 
 
@@ -71,7 +74,7 @@ def _current_text(p: Product) -> str:
 def _fact_text(ctx: ProposalContext) -> str:
     p = ctx.product
     options = " ".join(str(o) for v in p.variants for o in v.get("options", []))
-    prices = " ".join(str(v.get("price", "")) for v in p.variants)
+    prices = " ".join(f"${v.get('price', '')}" for v in p.variants)
     quotes = " ".join(c.quote for c in ctx.citations if c.ok)
     return " ".join((_current_text(p), p.vendor, p.product_type, " ".join(p.tags), options, prices, quotes))
 
@@ -105,6 +108,7 @@ def v03_html_safe(ctx: ProposalContext) -> ValidatorResult:
         problems.extend(f"tag not allowed: <{t}>" for t in sorted(set(audit.tags) - spec.ALLOWED_TAGS))
         problems.extend(f"attribute not allowed: {name} on <{tag}>" for tag, name in audit.attrs)
         problems.extend(audit.problems)
+        problems.extend(unsafe_markup(description))
     for key in ("seo_title", "seo_description"):
         value = ctx.changes.get(key)
         if isinstance(value, str) and ("<" in value or ">" in value):
@@ -113,13 +117,15 @@ def v03_html_safe(ctx: ProposalContext) -> ValidatorResult:
 
 
 _URL = re.compile(
-    r"(?i)\b(?:https?://|www\.)[^\s<>\"']+|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|net|org|io|co|ca|shop|store|info|biz|xyz)\b"
+    r"(?i)\b(?:https?://|www\.)[^\s<>\"']+|\b[a-z0-9-]{2,}(?:\.[a-z0-9-]+)*\.[a-z]{2,}\b(?:/[^\s<>\"']*)?"
 )
 _EMAIL = re.compile(r"(?i)\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b")
 _PHONE = re.compile(r"(?<![\w.])\+?\d[\d\s().-]{5,}\d(?![\w])")
 
 
-def _contacts(text: str) -> set[str]:
+def _contacts(raw: str) -> set[str]:
+    # Decoded first, so www&#46;evil&#46;com is seen the way a customer's browser will show it.
+    text = HIDDEN_CHARS.sub("", html.unescape(raw))
     found = {m.casefold().rstrip(".,;)") for m in _URL.findall(text)}
     found |= {m.casefold() for m in _EMAIL.findall(text)}
     for match in _PHONE.findall(text):
@@ -178,7 +184,7 @@ def v09_fact_preservation(ctx: ProposalContext) -> ValidatorResult:
     if not isinstance(new_description, str):
         return ValidatorResult("V09", True, {"skipped": "description unchanged"})
     visible = strip_html(ctx.product.description_html)
-    if len(visible) < spec.DESC_THIN_MIN or is_placeholder(visible):
+    if not visible or is_placeholder(visible):
         return ValidatorResult("V09", True, {"skipped": "original has no usable facts"})
     proposed_text = _proposed_visible(ctx.changes)
     kept_numbers = numbers_with_units(proposed_text)
@@ -212,7 +218,8 @@ def v11_injection_residue(ctx: ProposalContext) -> ValidatorResult:
     visible = _proposed_visible(ctx.changes)
     current = _current_text(ctx.product)
     hits = sorted(set(injection_hits(raw) + injection_hits(visible)) - set(injection_hits(current)))
-    residue = sorted({m.group(0).strip().casefold() for m in _RESIDUE.finditer(raw)})
+    existing = {m.group(0).strip().casefold() for m in _RESIDUE.finditer(current)}
+    residue = sorted({m.group(0).strip().casefold() for m in _RESIDUE.finditer(raw)} - existing)
     return ValidatorResult("V11", not hits and not residue, {"patterns": hits[:5], "residue": residue[:5]})
 
 

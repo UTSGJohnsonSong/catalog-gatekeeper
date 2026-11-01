@@ -65,7 +65,9 @@ def check_citations(
         chunk_id = citation.get("chunk_id")
         row = None
         if isinstance(chunk_id, str):
-            row = conn.execute("SELECT id, doc_id, text FROM policy_chunks WHERE id = %s", (chunk_id,)).fetchone()
+            row = conn.execute(
+                "SELECT id, doc_id, text FROM policy_chunks WHERE id = %s AND retired_at IS NULL", (chunk_id,)
+            ).fetchone()
         retrieved = False
         if row is not None and run_id is not None:
             retrieved = (

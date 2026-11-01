@@ -59,6 +59,9 @@ h1.catalog-voice { font-size: 2.2rem; letter-spacing: -0.005em; }
 .error { color: var(--stopped); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
+.flag { color: var(--hold); font-size: 0.92rem; font-weight: 600; }
+.ops-notice { background: var(--stopped-wash); padding: 0.45rem 0.7rem; border-radius: 3px; max-width: none; }
+
 .mode-banner {
   margin: 0;
   max-width: none;

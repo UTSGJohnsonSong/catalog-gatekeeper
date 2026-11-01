@@ -27,10 +27,11 @@ EXPECTED_TOOLS = {
 }
 
 
+# Roles are cluster-wide. These are the compose demo passwords, so running the tests cannot lock out a running demo.
 @pytest.fixture
 def mcp_url(ctx, database_url):
-    bootstrap_roles(database_url, Settings(mcp_db_password="test-mcp-pass", app_db_password="test-app-pass"))
-    return database_url.replace("gatekeeper:local-demo-owner", "gatekeeper_mcp_ro:test-mcp-pass")
+    bootstrap_roles(database_url, Settings(mcp_db_password="local-demo-mcp", app_db_password="local-demo-app"))
+    return database_url.replace("gatekeeper:local-demo-owner", "gatekeeper_mcp_ro:local-demo-mcp")
 
 
 def call(url, name, **args):
@@ -107,9 +108,44 @@ def test_the_database_role_cannot_write_or_read_base_tables(ctx, mcp_url, statem
 
 
 def test_app_role_cannot_rewrite_the_audit_log(ctx, mcp_url, database_url):
-    app_url = database_url.replace("gatekeeper:local-demo-owner", "gatekeeper_app:test-app-pass")
+    app_url = database_url.replace("gatekeeper:local-demo-owner", "gatekeeper_app:local-demo-app")
     with psycopg.connect(app_url) as conn:
         conn.execute("INSERT INTO audit_log (actor, action, entity_type, entity_id) VALUES ('t','a','e','1')")
         conn.commit()
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             conn.execute("DELETE FROM audit_log")
+
+
+def test_no_catalog_string_escapes_the_fence_in_any_tool(ctx, mcp_url):
+    import re
+
+    canary = "CANARY-TEXT"
+    product_id = seed_product(
+        ctx,
+        make_product(
+            title=canary,
+            vendor=canary,
+            product_type=canary,
+            handle=canary,
+            tags=[canary],
+            description_html=f"<p>{canary}</p>",
+            seo_title="",
+            variants=[{"gid": "v", "sku": canary, "price": "1.00", "options": [canary]}],
+            images=[{"id": "i", "alt": canary}],
+        ),
+    )
+    outputs = [
+        call(mcp_url, "catalog_list_products"),
+        call(mcp_url, "catalog_get_product", product_id=product_id),
+        call(mcp_url, "audit_list_findings", product_id=product_id),
+    ]
+    for output in outputs:
+        text = output.content[0].text
+        assert canary not in re.sub(r"<untrusted_data.*?</untrusted_data>", "", text, flags=re.S)
+    assert canary in outputs[1].content[0].text
+
+
+def test_long_text_says_it_was_cut(ctx, mcp_url):
+    product_id = seed_product(ctx, make_product(description_html="<p>" + "word " * 1000 + "</p>"))
+    product = payload(call(mcp_url, "catalog_get_product", product_id=product_id))
+    assert "[truncated]" in product["description_html"]

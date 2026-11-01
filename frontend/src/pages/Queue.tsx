@@ -8,9 +8,35 @@ import { statusName } from "./Proposal";
 const FILTERS: { key: string; label: string; statuses: string[] | null }[] = [
   { key: "open", label: "Needs review", statuses: ["pending_review"] },
   { key: "blocked", label: "Blocked", statuses: ["blocked"] },
-  { key: "done", label: "Decided", statuses: ["approved", "applying", "applied", "rejected", "stale", "failed"] },
+  { key: "failed", label: "Write failed", statuses: ["failed"] },
+  { key: "done", label: "Decided", statuses: ["approved", "applying", "applied", "rejected", "stale"] },
   { key: "all", label: "All", statuses: null },
 ];
+
+function OpsNotice() {
+  const { data, error } = useQuery({ queryKey: ["ops"], queryFn: api.ops, refetchInterval: 10000 });
+  if (error) {
+    return (
+      <p className="error" role="alert">
+        Could not check the health of background work: {error.message}
+      </p>
+    );
+  }
+  if (!data) return null;
+  const notes = [
+    data.failed_writes && `${data.failed_writes} write(s) failed`,
+    data.stuck_writes && `${data.stuck_writes} write(s) look stuck`,
+    data.dead_jobs && `${data.dead_jobs} background job(s) gave up`,
+    data.failed_runs_today && `${data.failed_runs_today} agent run(s) ended without a result today`,
+    data.webhooks_failed_today && `${data.webhooks_failed_today} webhook(s) could not be used today`,
+  ].filter(Boolean);
+  if (notes.length === 0) return null;
+  return (
+    <p className="ops-notice" role="status">
+      Needs a person: {notes.join(", ")}. See the runbook.
+    </p>
+  );
+}
 
 function Row({ item }: { item: QueueItem }) {
   return (
@@ -36,8 +62,10 @@ export function QueuePage() {
 
   const active = FILTERS.find((candidate) => candidate.key === filter)!;
   const items = (data?.items ?? []).filter((item) => !active.statuses || active.statuses.includes(item.status));
+  // Counts come from the server, because the list itself is capped.
+  const counts = data?.counts ?? {};
   const count = (statuses: string[] | null) =>
-    (data?.items ?? []).filter((item) => !statuses || statuses.includes(item.status)).length;
+    (statuses ?? Object.keys(counts)).reduce((total, status) => total + (counts[status] ?? 0), 0);
 
   return (
     <>
@@ -47,6 +75,7 @@ export function QueuePage() {
           Audit more products
         </button>
       </div>
+      <OpsNotice />
       {run.isError && (
         <p className="error" role="alert">
           Could not start the audit: {run.error.message}

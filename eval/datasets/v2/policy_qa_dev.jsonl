@@ -1,0 +1,37 @@
+{"gold_chunk_ids":["returns#000"],"id":"q02","question":"How do I start a return and get a prepaid label?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["returns#001"],"id":"q03","question":"When will my refund go back to the original payment method?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["returns#002"],"id":"q05","question":"Are exchanges for a different size free?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["returns#002"],"id":"q06","question":"Can I return shoes with marks on the outsole?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["returns#003"],"id":"q07","question":"What if an item arrives damaged?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["shipping#000"],"id":"q08","question":"Do you ship to post office boxes?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["shipping#001"],"id":"q11","question":"When is the tracking number sent?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["shipping#002"],"id":"q13","question":"Who pays import duties on United States orders?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["shipping#003"],"id":"q14","question":"Do large orders arrive in more than one parcel?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["warranty#000"],"id":"q15","question":"How long is the standard limited warranty?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["warranty#000"],"id":"q16","question":"What warranty do bags and backpacks carry on zippers?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["warranty#001"],"id":"q17","question":"Are dents covered on insulated bottles?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["warranty#002"],"id":"q19","question":"Does footwear have a warranty against sole separation?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["warranty#002"],"id":"q20","question":"How do I make a warranty claim?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["warranty#003"],"id":"q21","question":"Does the warranty cover commercial use and misuse?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["care-and-materials#000"],"id":"q22","question":"How should I wash wool and merino knitwear?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["care-and-materials#001"],"id":"q24","question":"How often should I apply leather conditioner?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["shipping#001"],"id":"q36","question":"How much does express shipping cost?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["returns#001"],"id":"q37","question":"Is store credit faster than a refund?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["warranty#001"],"id":"q38","question":"Are lids and gaskets covered?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["care-and-materials#002"],"id":"q39","question":"Do you make antimicrobial claims about fabric?","split":"dev","subset":"lexical"}
+{"gold_chunk_ids":["returns#000"],"id":"p01","question":"Can I send back a jumper I never wore a month later?","split":"dev","subset":"paraphrase"}
+{"gold_chunk_ids":["returns#001"],"id":"p02","question":"When does the money come back to my card?","split":"dev","subset":"paraphrase"}
+{"gold_chunk_ids":["returns#002"],"id":"p03","question":"I want the same thing in another colour instead.","split":"dev","subset":"paraphrase"}
+{"gold_chunk_ids":["shipping#000"],"id":"p06","question":"How quickly will my package get to Toronto?","split":"dev","subset":"paraphrase"}
+{"gold_chunk_ids":["warranty#001"],"id":"p11","question":"My flask stopped keeping coffee hot after a year.","split":"dev","subset":"paraphrase"}
+{"gold_chunk_ids":["care-and-materials#000"],"id":"p13","question":"Can I throw my sweater in the dryer?","split":"dev","subset":"paraphrase"}
+{"gold_chunk_ids":["care-and-materials#000"],"id":"p14","question":"My tee got smaller after laundry.","split":"dev","subset":"paraphrase"}
+{"gold_chunk_ids":["care-and-materials#001"],"id":"p15","question":"How do I keep my wallet from cracking?","split":"dev","subset":"paraphrase"}
+{"gold_chunk_ids":["care-and-materials#002"],"id":"p16","question":"Rain no longer rolls off my coat.","split":"dev","subset":"paraphrase"}
+{"gold_chunk_ids":["sizing#000"],"id":"p17","question":"I am between a medium and a large, what should I pick?","split":"dev","subset":"paraphrase"}
+{"gold_chunk_ids":["sizing#001"],"id":"p18","question":"When in the day should I check my foot length?","split":"dev","subset":"paraphrase"}
+{"gold_chunk_ids":["sizing#002"],"id":"p20","question":"Which pack is right for a night away?","split":"dev","subset":"paraphrase"}
+{"gold_chunk_ids":[],"id":"u01","question":"Do you price match other retailers?","split":"dev","subset":"unanswerable"}
+{"gold_chunk_ids":[],"id":"u03","question":"Do you have a physical store in Montreal?","split":"dev","subset":"unanswerable"}
+{"gold_chunk_ids":[],"id":"u04","question":"Is there a student discount?","split":"dev","subset":"unanswerable"}
+{"gold_chunk_ids":[],"id":"u06","question":"What is the carbon footprint of a tent?","split":"dev","subset":"unanswerable"}

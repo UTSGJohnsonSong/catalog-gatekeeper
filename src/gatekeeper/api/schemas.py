@@ -100,6 +100,8 @@ class ProposalDetail(BaseModel):
     decided_at: datetime | None
     applied_at: datetime | None
     writeback_status: str | None
+    writeback_errors: list[dict[str, Any]]
+    judge_discarded: int
     judge_status: str
 
 
@@ -115,6 +117,16 @@ class RejectRequest(BaseModel):
 class DecisionResult(BaseModel):
     id: str
     status: str
+
+
+class Ops(BaseModel):
+    """What needs a person. Zero everywhere means nothing is known to be wrong."""
+
+    dead_jobs: int
+    failed_writes: int
+    stuck_writes: int
+    failed_runs_today: int
+    webhooks_failed_today: int
 
 
 class ProductOut(BaseModel):

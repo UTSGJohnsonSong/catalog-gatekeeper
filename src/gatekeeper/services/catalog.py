@@ -95,6 +95,15 @@ def stale_open_proposals(conn: Conn, product_id: int, *, current_hash: str | Non
     return cursor.rowcount
 
 
+def mark_deleted(conn: Conn, product_id: int) -> None:
+    conn.execute("UPDATE products SET deleted_at = now() WHERE id = %s AND deleted_at IS NULL", (product_id,))
+    stale_open_proposals(conn, product_id, current_hash=None)
+    conn.execute(
+        "UPDATE findings SET status = 'resolved', resolved_at = now() WHERE product_id = %s AND status = 'open'",
+        (product_id,),
+    )
+
+
 def active_title_counts(conn: Conn, shop_id: int) -> Counter[str]:
     rows = conn.execute(
         "SELECT title FROM products WHERE shop_id = %s AND status = 'ACTIVE' AND deleted_at IS NULL", (shop_id,)

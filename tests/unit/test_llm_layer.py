@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import anthropic
 import httpx
 import pytest
-from hypothesis import given
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from gatekeeper.agent.fence import fence, new_nonce, sanitize, unfence
@@ -137,6 +137,7 @@ class TestJudge:
 
         assert run_judge(Down([]), proposed_text="p", source_text="s").status == "unavailable"
 
+    @settings(suppress_health_check=[HealthCheck.too_slow])
     @given(
         st.lists(
             st.dictionaries(

@@ -125,9 +125,12 @@ def test_daily_cap_refuses_to_start(ctx):
 
 def test_propose_limit_is_enforced(ctx):
     product_id = seed_product(ctx, make_product(description_html=THIN_HTML))
-    attempt = lambda i: tool_call(
-        "propose_fix", changes={"description_html": f"<p>Too short {i}</p>"}, rationale="x", citations=[]
-    )  # noqa: E731
+
+    def attempt(i):
+        return tool_call(
+            "propose_fix", changes={"description_html": f"<p>Too short {i}</p>"}, rationale="x", citations=[]
+        )
+
     ctx2, _ = with_script(
         ctx,
         turn(attempt(1)),
@@ -139,14 +142,17 @@ def test_propose_limit_is_enforced(ctx):
     assert statuses(ctx, product_id) == ["blocked", "blocked"]
 
 
-def test_provider_failure_ends_the_run_with_the_error_recorded(ctx):
+def test_provider_failure_records_the_error_and_reraises_for_the_queue(ctx):
     class Down(ScriptedProvider):
         def create(self, **kwargs):
             raise LLMError("overloaded", retryable=True)
 
     product_id = seed_product(ctx)
-    result = run_agent(replace(ctx, provider=Down([])), product_id)
-    assert result.status == "failed" and "overloaded" in result.error
+    with pytest.raises(LLMError):
+        run_agent(replace(ctx, provider=Down([])), product_id)
+    with ctx.pool.connection() as conn:
+        row = conn.execute("SELECT status::text AS s, error FROM agent_runs").fetchone()
+    assert row["s"] == "failed" and "overloaded" in row["error"]
 
 
 class TestInjection:

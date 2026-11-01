@@ -14,6 +14,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from psycopg import errors as pg_errors
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from gatekeeper import jobs
 from gatekeeper.api import schemas
@@ -29,6 +30,7 @@ from gatekeeper.services import webhooks as webhook_service
 from gatekeeper.services.writeback import set_kill_switch
 from gatekeeper.shopify import webhook_hmac
 from gatekeeper.shopify.fixture import FixtureShopify
+from gatekeeper.worker import configure_logging
 
 log = logging.getLogger("gatekeeper.api")
 MAX_WEBHOOK_BYTES = 5 * 1024 * 1024
@@ -50,12 +52,24 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         owns = ctx is None
+        if owns:
+            configure_logging()
         app.state.ctx = ctx or build_context(settings)
         yield
         if owns:
             app.state.ctx.pool.close()
 
-    app = FastAPI(title="Catalog Gatekeeper", version="0.1.0", lifespan=lifespan)
+    in_production = settings.env == "production"
+    app = FastAPI(
+        title="Catalog Gatekeeper",
+        version="0.1.0",
+        lifespan=lifespan,
+        docs_url=None if in_production else "/docs",
+        redoc_url=None if in_production else "/redoc",
+        openapi_url=None if in_production else "/openapi.json",
+    )
+    if settings.allowed_hosts:
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=[h.strip() for h in settings.allowed_hosts.split(",")])
     app.state.tokens = load_tokens(settings)
     app.state.settings = settings
 
@@ -65,6 +79,8 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Frame-Options"] = "DENY"
+        if in_production:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; frame-ancestors 'none'; "
             "base-uri 'none'; form-action 'self'"
@@ -250,9 +266,13 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
                 ids = [
                     r["product_id"]
                     for r in conn.execute(
-                        "SELECT DISTINCT f.product_id FROM findings f WHERE f.status = 'open' AND f.fixable "
+                        "SELECT DISTINCT f.product_id FROM findings f JOIN products pr ON pr.id = f.product_id "
+                        "WHERE f.status = 'open' AND f.fixable AND pr.deleted_at IS NULL "
                         "AND NOT EXISTS (SELECT 1 FROM proposals p WHERE p.product_id = f.product_id "
-                        "AND p.status IN ('pending_review','approved','applying')) ORDER BY 1 LIMIT %s",
+                        "AND p.status IN ('pending_review','approved','applying')) "
+                        # A product already tried at this content would just pay for the same outcome again.
+                        "AND NOT EXISTS (SELECT 1 FROM agent_runs r WHERE r.product_id = f.product_id "
+                        "AND r.base_content_hash = pr.content_hash) ORDER BY 1 LIMIT %s",
                         (body.limit,),
                     ).fetchall()
                 ]
@@ -266,6 +286,24 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
     ) -> dict[str, bool]:
         set_kill_switch(_ctx(request), enabled=body.enabled, actor=f"admin:{principal.name}")
         return {"enabled": body.enabled}
+
+    @app.get("/api/ops", response_model=schemas.Ops, tags=["admin"])
+    def ops(request: Request, _: Principal = Depends(current_principal)) -> schemas.Ops:
+        with tx(_ctx(request).pool) as conn:
+            row = conn.execute(
+                """
+                SELECT
+                  (SELECT count(*) FROM jobs WHERE status = 'dead') AS dead_jobs,
+                  (SELECT count(*) FROM proposals WHERE status = 'failed') AS failed_writes,
+                  (SELECT count(*) FROM proposals WHERE status = 'applying'
+                     AND updated_at < now() - interval '5 minutes') AS stuck_writes,
+                  (SELECT count(*) FROM agent_runs WHERE status NOT IN ('finished','running')
+                     AND started_at >= date_trunc('day', now())) AS failed_runs_today,
+                  (SELECT count(*) FROM webhook_events WHERE status = 'failed'
+                     AND received_at >= date_trunc('day', now())) AS webhooks_failed_today
+                """
+            ).fetchone()
+        return schemas.Ops(**(row or {}))
 
     @app.get("/api/audit-log", response_model=list[schemas.AuditEntry], tags=["admin"])
     def audit_log(
@@ -284,14 +322,22 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
         secret = settings.shopify_webhook_secret
         if secret is None:
             return JSONResponse({"error": "webhook secret not configured"}, status_code=503)
+        # Counted while reading, because a chunked request declares no length and must not fill memory unsigned.
         declared = request.headers.get("content-length")
         if declared and declared.isdigit() and int(declared) > MAX_WEBHOOK_BYTES:
             return JSONResponse({"error": "too large"}, status_code=413)
-        raw = await request.body()
-        if len(raw) > MAX_WEBHOOK_BYTES:
-            return JSONResponse({"error": "too large"}, status_code=413)
+        chunks: list[bytes] = []
+        received = 0
+        async for chunk in request.stream():
+            received += len(chunk)
+            if received > MAX_WEBHOOK_BYTES:
+                return JSONResponse({"error": "too large"}, status_code=413)
+            chunks.append(chunk)
+        raw = b"".join(chunks)
         # Verified on raw bytes before any parsing. Failures store nothing.
-        if not webhook_hmac.verify(secret.get_secret_value(), raw, request.headers.get("x-shopify-hmac-sha256")):
+        signature = request.headers.get("x-shopify-hmac-sha256")
+        if not await run_in_threadpool(webhook_hmac.verify, secret.get_secret_value(), raw, signature):
+            log.warning("webhook rejected: bad or missing signature")
             return JSONResponse({"error": "invalid signature"}, status_code=401)
         webhook_id = request.headers.get("x-shopify-webhook-id")
         topic = request.headers.get("x-shopify-topic")
@@ -299,7 +345,10 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
             return JSONResponse({"error": "missing webhook headers"}, status_code=400)
         shop_domain = request.headers.get("x-shopify-shop-domain", "")
         if shop_domain != settings.shopify_shop_domain:
-            log.info("webhook for an unknown shop ignored")
+            # Correctly signed, so this is a configuration fault, and it stops updates from arriving.
+            log.error(
+                "signed webhook for %r ignored; this deployment serves %r", shop_domain, settings.shopify_shop_domain
+            )
             return JSONResponse({"status": "ignored"})
         outcome = await run_in_threadpool(
             webhook_service.record_event,
@@ -345,7 +394,8 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
                 "X-Shopify-Shop-Domain": settings.shopify_shop_domain,
                 "Content-Type": "application/json",
             }
-            port = request.url.port or 8000
+            # The port comes from the server's own socket, never from the client's Host header.
+            port = request.scope["server"][1]
             httpx.post(
                 f"http://127.0.0.1:{port}/webhooks/shopify", content=raw, headers=headers, timeout=5
             ).raise_for_status()
@@ -371,7 +421,7 @@ def _proposal_detail(ctx: AppContext, pid: str) -> schemas.ProposalDetail:
             """
             SELECT p.*, pr.title AS product_title, pr.gid, pr.description_html, pr.seo_title, pr.seo_description,
                    ar.mode, ar.model, ar.provider, ar.flags AS run_flags, w.status AS writeback_status,
-                   w.before_snapshot
+                   w.before_snapshot, w.user_errors
             FROM proposals p JOIN products pr ON pr.id = p.product_id
             LEFT JOIN agent_runs ar ON ar.id = p.run_id LEFT JOIN writebacks w ON w.proposal_id = p.id
             WHERE p.id = %s
@@ -407,10 +457,6 @@ def _proposal_detail(ctx: AppContext, pid: str) -> schemas.ProposalDetail:
         for name in ALLOWED_FIELDS
         if name in row["proposed"]
     ]
-    judge_rows = [v for v in validation if v["kind"] == "judge"]
-    judge_status = "disabled" if ctx.judge is None else "ok"
-    if any(v["rule_id"] == "J00" for v in judge_rows):
-        judge_status = "unavailable"
     return schemas.ProposalDetail(
         id=pid,
         status=row["status"],
@@ -456,5 +502,7 @@ def _proposal_detail(ctx: AppContext, pid: str) -> schemas.ProposalDetail:
         decided_at=row["decided_at"],
         applied_at=row["applied_at"],
         writeback_status=row["writeback_status"],
-        judge_status=judge_status,
+        judge_status=row["judge_status"],
+        judge_discarded=row["judge_discarded"],
+        writeback_errors=row["user_errors"] or [],
     )

@@ -1,8 +1,9 @@
 """The demo model: a deterministic template script that speaks the tool protocol. It is not an LLM.
 
 It exists so the whole pipeline runs with no key. Its output says nothing about model accuracy, and every
-surface that shows its work labels it (see docs/DEMO_HONESTY.md). It builds fixes only from structured
-fields, so it ignores any instruction found in product text.
+surface that shows its work labels it (see docs/DEMO_HONESTY.md). It fills a fixed template from product fields
+and never interprets their text, so an instruction in a product cannot change what it does. The one exception is
+the fixture-only demo.misbehave metafield, which makes it emit a deliberately bad fix for the demo.
 """
 
 from __future__ import annotations
@@ -116,7 +117,7 @@ class HeuristicProvider:
         visible = fields.get("description_text", "")
         keep_original = visible and not injected and not {"A01", "A03"} & fixable
         options = sorted(
-            {o for v in product.get("variants", []) for o in v.get("options", []) if o and o != "Default Title"}
+            {unfence(o) for v in product.get("variants", []) for o in v.get("options", [])} - {"", "Default Title"}
         )
         paragraphs = [f"<p>{html.escape(sentences[0], quote=False)}</p>"]
         if keep_original:

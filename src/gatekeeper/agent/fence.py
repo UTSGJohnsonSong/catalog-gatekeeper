@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import html
 import re
 import secrets
 import unicodedata
@@ -26,7 +27,7 @@ def sanitize(text: str) -> tuple[str, bool]:
 
 def fence(field: str, text: str, nonce: str) -> str:
     cleaned, _ = sanitize(text)
-    return f'<untrusted_data field="{field}" nonce="{nonce}">{cleaned}</untrusted_data>'
+    return f'<untrusted_data field="{html.escape(field, quote=True)}" nonce="{nonce}">{cleaned}</untrusted_data>'
 
 
 def unfence(value: str) -> str:

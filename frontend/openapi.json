@@ -270,6 +270,40 @@
     "title": "Meta",
     "type": "object"
    },
+   "Ops": {
+    "description": "What needs a person. Zero everywhere means nothing is known to be wrong.",
+    "properties": {
+     "dead_jobs": {
+      "title": "Dead Jobs",
+      "type": "integer"
+     },
+     "failed_runs_today": {
+      "title": "Failed Runs Today",
+      "type": "integer"
+     },
+     "failed_writes": {
+      "title": "Failed Writes",
+      "type": "integer"
+     },
+     "stuck_writes": {
+      "title": "Stuck Writes",
+      "type": "integer"
+     },
+     "webhooks_failed_today": {
+      "title": "Webhooks Failed Today",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "dead_jobs",
+     "failed_writes",
+     "stuck_writes",
+     "failed_runs_today",
+     "webhooks_failed_today"
+    ],
+    "title": "Ops",
+    "type": "object"
+   },
    "ProductOut": {
     "properties": {
      "content_hash": {
@@ -386,6 +420,10 @@
       "title": "Id",
       "type": "string"
      },
+     "judge_discarded": {
+      "title": "Judge Discarded",
+      "type": "integer"
+     },
      "judge_status": {
       "title": "Judge Status",
       "type": "string"
@@ -479,6 +517,14 @@
       "title": "Validation",
       "type": "array"
      },
+     "writeback_errors": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Writeback Errors",
+      "type": "array"
+     },
      "writeback_status": {
       "anyOf": [
        {
@@ -514,6 +560,8 @@
      "decided_at",
      "applied_at",
      "writeback_status",
+     "writeback_errors",
+     "judge_discarded",
      "judge_status"
     ],
     "title": "ProposalDetail",
@@ -1002,6 +1050,32 @@
     "summary": "Meta",
     "tags": [
      "meta"
+    ]
+   }
+  },
+  "/api/ops": {
+   "get": {
+    "operationId": "ops_api_ops_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Ops"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Ops",
+    "tags": [
+     "admin"
     ]
    }
   },

@@ -1,4 +1,4 @@
-"""CLI. Every run saves its command, output and report under eval/reports, so each number can be traced.
+"""CLI. Every run saves its command, console summary and full report under eval/reports, so a number can be traced.
 
 python -m gatekeeper_eval build
 python -m gatekeeper_eval audit --split dev
@@ -37,18 +37,31 @@ def _git_sha() -> str:
         return "unknown"
 
 
-def _save(report: dict[str, Any], command: str, failures: list[str]) -> Path:
+def _git_dirty() -> bool | None:
+    try:
+        out = subprocess.run(
+            ["git", "status", "--porcelain", "--", "src", "eval/gates.yaml", "eval/spec"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )  # noqa: S607
+        return bool(out.stdout.strip())
+    except (subprocess.SubprocessError, OSError):
+        return None
+
+
+def _save(report: dict[str, Any], command: str, failures: list[str], *, gate: str | None = None) -> Path:
     REPORTS.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     report = {
         "command": command,
         "ran_at_utc": stamp,
         "git_sha": _git_sha(),
+        "uncommitted_source_changes": _git_dirty(),
         "dataset_test_sha256": freezer.combined_test_hash(),
-        "frozen_test_split_intact": freezer.is_frozen_intact(),
         "limits": LIMITS,
         **report,
-        "gate": "PASS" if not failures else "FAIL",
+        "gate": gate or ("PASS" if not failures else "FAIL"),
         "gate_failures": failures,
     }
     path = REPORTS / f"{report['suite']}-{report['split']}-{stamp}.json"
@@ -121,15 +134,20 @@ def main() -> int:
             if report.get("status") == "SKIPPED"
             else "Agent accuracy measured against a real model."
         )
-        _save(report, command_line, [])
+        # There is no agent gate yet, so this report must never read as a pass.
+        _save(report, command_line, [], gate="SKIPPED" if report.get("status") == "SKIPPED" else "NOT_GATED")
         return 0
     chosen = list(suites) if args.command == "all" else [args.command]
     failed = False
     for name in chosen:
         report = suites[name]()
+        report["frozen_test_split_intact"] = freezer.is_frozen_intact()
         failures = gates.judge(report)
+        report["console_summary"] = (
+            f"{name} ({report['split']}): {'PASS' if not failures else 'FAIL'}: {_summary(report)}"
+        )
         path = _save(report, command_line, failures)
-        print(f"{name} ({report['split']}): {'PASS' if not failures else 'FAIL'}: {_summary(report)}")
+        print(report["console_summary"])
         print(f"  report: {path.relative_to(REPORTS.parents[1])}")
         for failure in failures:
             print(f"  gate failure: {failure}")

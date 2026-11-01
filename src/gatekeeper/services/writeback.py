@@ -1,8 +1,8 @@
 """Write-back. One code path serves the first run, retries and crash recovery.
 
 A session advisory lock per proposal makes the executor exclusive for the whole operation, and the database
-releases it if the process dies, so recovery can never race a live writer. Whether an earlier attempt landed
-is answered by comparing hashes against the store, never by trusting local state.
+releases it if the session ends, so recovery does not race a live writer. Whether an earlier attempt landed is
+answered by comparing hashes against the store, never by trusting local state.
 
 Live limit: Shopify documents no precondition on productUpdate, so a merchant edit can slip in between the
 refetch and the mutation (about one round trip). before_snapshot, read-back and the audit log bound that
@@ -21,7 +21,7 @@ from psycopg.types.json import Jsonb
 from gatekeeper.context import AppContext
 from gatekeeper.db import tx
 from gatekeeper.domain.product import ALLOWED_FIELDS, Product, approval_hash, content_hash, fields_hash
-from gatekeeper.services.catalog import active_title_counts, refresh_findings, upsert_product
+from gatekeeper.services.catalog import active_title_counts, refresh_findings, upsert_product, write_audit
 
 log = logging.getLogger("gatekeeper.writeback")
 ACTOR = "worker:apply"
@@ -48,10 +48,15 @@ def apply_proposal(ctx: AppContext, proposal_id: str) -> ApplyResult:
         if not got:
             return ApplyResult("in_progress", "another worker holds this proposal")
         try:
-            return _apply_locked(ctx, proposal_id)
+            result = _apply_locked(ctx, proposal_id)
         finally:
             lock_conn.execute("SELECT pg_advisory_unlock(%s)", (key,))
             lock_conn.commit()
+    if result.status == "failed":
+        log.error("write-back failed: %s", result.detail, extra={"proposal_id": proposal_id})
+    elif result.status == "stale":
+        log.warning("write-back found the proposal out of date: %s", result.detail, extra={"proposal_id": proposal_id})
+    return result
 
 
 def _transition(
@@ -86,13 +91,11 @@ def _claim(ctx: AppContext, proposal_id: str) -> tuple[dict[str, Any] | None, Ap
                 return None, ApplyResult(row["status"], "nothing to do")
         gid = conn.execute("SELECT gid FROM products WHERE id = %s", (row["product_id"],)).fetchone()["gid"]
         wb = conn.execute(
-            "INSERT INTO writebacks (proposal_id, idempotency_key, status) VALUES (%s, %s, 'claimed') "
-            "ON CONFLICT (proposal_id) DO UPDATE SET attempts = writebacks.attempts + 1, updated_at = now() "
-            "RETURNING attempts",
+            "INSERT INTO writebacks (proposal_id, idempotency_key, status, attempts) VALUES (%s, %s, 'claimed', 0) "
+            "ON CONFLICT (proposal_id) DO UPDATE SET updated_at = now() RETURNING status, attempts",
             (proposal_id, hashlib.sha256(f"{proposal_id}{row['approved_hash']}".encode()).hexdigest()),
         ).fetchone()
-        row = {**row, "gid": gid, "attempts": wb["attempts"]}
-    return row, None
+    return {**row, "gid": gid, "attempts": wb["attempts"], "writeback_status": wb["status"]}, None
 
 
 def _apply_locked(ctx: AppContext, proposal_id: str) -> ApplyResult:
@@ -100,15 +103,6 @@ def _apply_locked(ctx: AppContext, proposal_id: str) -> ApplyResult:
     if early is not None:
         return early
     assert row is not None
-    if row["attempts"] > MAX_APPLY_ATTEMPTS:
-        _transition(
-            ctx,
-            proposal_id,
-            "failed",
-            writeback_status="failed",
-            user_errors=[{"message": "needs_human: too many attempts"}],
-        )
-        return ApplyResult("failed", "too many attempts")
 
     expected_approval = approval_hash(
         proposal_id=proposal_id,
@@ -118,7 +112,6 @@ def _apply_locked(ctx: AppContext, proposal_id: str) -> ApplyResult:
         proposed=row["proposed"],
     )
     if expected_approval != row["approved_hash"]:
-        log.error("approved_hash mismatch", extra={"proposal_id": proposal_id})
         _transition(
             ctx, proposal_id, "failed", writeback_status="failed", user_errors=[{"message": "approved_hash_mismatch"}]
         )
@@ -130,14 +123,34 @@ def _apply_locked(ctx: AppContext, proposal_id: str) -> ApplyResult:
         _transition(ctx, proposal_id, "stale", writeback_status="stale")
         return ApplyResult("stale", "product no longer exists")
     target_fields_hash = fields_hash(current.with_changes(proposed))
+    # Checked first, so an exhausted attempt count can never mislabel a write that did land.
     if fields_hash(current) == target_fields_hash:
-        # An earlier attempt landed but crashed before recording it. Do not write again.
         return _finish_applied(ctx, proposal_id, row, current)
     if content_hash(current) != row["base_content_hash"]:
+        if row["writeback_status"] == "sent":
+            # A mutation was sent earlier with an unknown result, and the store now matches neither version.
+            # The write may be live under a later edit, so "nothing was written" would be a false statement.
+            _transition(
+                ctx,
+                proposal_id,
+                "failed",
+                writeback_status="failed",
+                user_errors=[{"message": "outcome_unknown: an earlier write may have reached the store"}],
+            )
+            return ApplyResult("failed", "outcome_unknown")
         _transition(
             ctx, proposal_id, "stale", writeback_status="stale", response={"note": "store changed before write"}
         )
         return ApplyResult("stale", "store content differs from the approved base")
+    if row["attempts"] >= MAX_APPLY_ATTEMPTS:
+        _transition(
+            ctx,
+            proposal_id,
+            "failed",
+            writeback_status="failed",
+            user_errors=[{"message": f"needs_human: gave up after {row['attempts']} write attempts"}],
+        )
+        return ApplyResult("failed", "too many write attempts")
 
     with tx(ctx.pool, ACTOR) as conn:
         enabled = conn.execute("SELECT writeback_enabled FROM shops WHERE id = %s", (row["shop_id"],)).fetchone()[
@@ -149,7 +162,8 @@ def _apply_locked(ctx: AppContext, proposal_id: str) -> ApplyResult:
         before = {name: getattr(current, name) for name in ALLOWED_FIELDS}
         # Committed before the mutation: if the process dies mid-call, the restore data already exists.
         conn.execute(
-            "UPDATE writebacks SET status = 'sent', before_snapshot = %s, expected_after_hash = %s, request = %s, "
+            "UPDATE writebacks SET status = 'sent', attempts = attempts + 1, "
+            "before_snapshot = coalesce(before_snapshot, %s), expected_after_hash = %s, request = %s, "
             "updated_at = now() WHERE proposal_id = %s",
             (Jsonb(before), target_fields_hash, Jsonb(proposed), proposal_id),
         )
@@ -173,7 +187,7 @@ def _apply_locked(ctx: AppContext, proposal_id: str) -> ApplyResult:
             "failed",
             writeback_status="failed",
             response={"expected_after_hash": target_fields_hash, "got": got},
-            user_errors=[{"message": "verification_mismatch"}],
+            user_errors=[{"message": "verification_mismatch: the store accepted the write but holds different text"}],
         )
         return ApplyResult("failed", "verification_mismatch")
     return _finish_applied(ctx, proposal_id, row, refetched)
@@ -194,8 +208,6 @@ def _finish_applied(ctx: AppContext, proposal_id: str, row: dict[str, Any], prod
 
 
 def set_kill_switch(ctx: AppContext, *, enabled: bool, actor: str) -> None:
-    from gatekeeper.services.catalog import write_audit
-
     with tx(ctx.pool, actor) as conn:
         conn.execute("UPDATE shops SET writeback_enabled = %s WHERE id = %s", (enabled, ctx.shop_id))
         write_audit(

@@ -74,8 +74,8 @@ def fields_hash(p: Product) -> str:
         canon_json(
             {
                 "description_html": html_canon(p.description_html),
-                "seo_title": p.seo_title,
-                "seo_description": p.seo_description,
+                "seo_title": p.seo_title.strip(),
+                "seo_description": p.seo_description.strip(),
             }
         )
     )

@@ -53,17 +53,32 @@ async def check_mcp() -> None:
 
     async with Client(MCP_URL) as client:
         tools = (await client.list_tools()).tools
-        expect(all(t.annotations and t.annotations.read_only_hint for t in tools), f"MCP exposes {len(tools)} tools, all read-only")
+        expect(
+            all(t.annotations and t.annotations.read_only_hint for t in tools),
+            f"MCP exposes {len(tools)} tools, all read-only",
+        )
         result = await client.call_tool("audit_list_proposals", {"limit": 3})
         rows = json.loads(result.content[0].text)
-        expect(bool(rows) and rows[0]["mode"] == "demo", "MCP reads proposals over streamable HTTP and labels the demo model")
-        search = await client.call_tool("policy_search", {"query_text": "how long do I have to return unworn items", "k": 1})
-        expect(json.loads(search.content[0].text)[0]["doc_id"] == "returns", "MCP policy search finds the returns policy")
+        expect(
+            bool(rows) and rows[0]["mode"] == "demo",
+            "MCP reads proposals over streamable HTTP and labels the demo model",
+        )
+        search = await client.call_tool(
+            "policy_search", {"query_text": "how long do I have to return unworn items", "k": 1}
+        )
+        expect(
+            json.loads(search.content[0].text)[0]["doc_id"] == "returns", "MCP policy search finds the returns policy"
+        )
 
 
 def main() -> int:
-    status, meta = wait_for("the API", lambda: (lambda r: r if r[0] == 200 else None)(call("GET", "/api/meta", token=None)))
-    expect(status == 200 and meta["demo_mode"] and meta["model_mode"] == "demo", f"API is up in demo mode, model {meta['model']}")
+    status, meta = wait_for(
+        "the API", lambda: (lambda r: r if r[0] == 200 else None)(call("GET", "/api/meta", token=None))
+    )
+    expect(
+        status == 200 and meta["demo_mode"] and meta["model_mode"] == "demo",
+        f"API is up in demo mode, model {meta['model']}",
+    )
     expect(call("GET", "/api/queue", token=None)[0] == 401, "the queue refuses a request with no token")
 
     def queue_has_all():
@@ -73,7 +88,9 @@ def main() -> int:
 
     items = wait_for("pending and blocked fixes", queue_has_all)
     pending = [i for i in items if i["status"] == "pending_review"]
-    expect(all(i["model_mode"] == "demo" for i in items), f"{len(items)} fixes in the queue, all labelled as demo model")
+    expect(
+        all(i["model_mode"] == "demo" for i in items), f"{len(items)} fixes in the queue, all labelled as demo model"
+    )
 
     target = pending[0]
     detail = call("GET", f"/api/proposals/{target['id']}")[1]
@@ -84,9 +101,14 @@ def main() -> int:
     expect(approved == 200, "approval with the right review hash is accepted")
     final = wait_for(
         "the write-back",
-        lambda: (lambda p: p if p["status"] in ("applied", "failed", "stale") else None)(call("GET", f"/api/proposals/{target['id']}")[1]),
+        lambda: (lambda p: p if p["status"] in ("applied", "failed", "stale") else None)(
+            call("GET", f"/api/proposals/{target['id']}")[1]
+        ),
     )
-    expect(final["status"] == "applied" and final["writeback_status"] == "verified", "the fix was written and verified by read-back")
+    expect(
+        final["status"] == "applied" and final["writeback_status"] == "verified",
+        "the fix was written and verified by read-back",
+    )
     products = call("GET", "/api/products")[1]
     row = next(p for p in products if p["id"] == target["product_id"])
     expect(row["content_hash"] != detail["base_content_hash"], "the product's content hash changed in the store")

@@ -71,6 +71,7 @@ class AnthropicProvider:
             input_tokens=response.usage.input_tokens or 0,
             output_tokens=response.usage.output_tokens or 0,
             cache_read_tokens=getattr(response.usage, "cache_read_input_tokens", 0) or 0,
+            cache_write_tokens=getattr(response.usage, "cache_creation_input_tokens", 0) or 0,
         )
         # response.content goes back unchanged: thinking blocks must be replayed as they came.
         return LLMTurn(response.stop_reason or "unknown", blocks, response.content, usage, latency_ms, response.model)

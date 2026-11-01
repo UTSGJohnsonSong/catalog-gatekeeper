@@ -93,6 +93,9 @@ class TestBootSafety:
             shopify_webhook_secret="s",
             llm_provider="anthropic",
             anthropic_api_key="k",
+            shopify_adapter="live",
+            shopify_access_token="t",
+            shopify_shop_domain="x.myshopify.com",
         )
         base.update(overrides)
         return Settings(**base)
@@ -110,6 +113,8 @@ class TestBootSafety:
             {"llm_provider": "heuristic"},
             {"anthropic_api_key": None},
             {"shopify_adapter": "live", "shopify_access_token": None},
+            {"shopify_adapter": "fixture"},
+            {"shopify_webhook_secret": "   "},
         ],
     )
     def test_unsafe_production_config_refuses_to_boot(self, overrides):

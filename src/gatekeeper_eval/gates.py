@@ -26,7 +26,13 @@ def judge(report: dict[str, Any]) -> list[str]:
     gates = yaml.safe_load(GATES_FILE.read_text(encoding="utf-8"))
     suite, split = report["suite"], report["split"]
     failures: list[str] = []
+    if suite not in ("e2e", "audit", "validators", "retrieval", "citations"):
+        return [f"no gate is defined for suite {suite!r}"]
+    if split == "test" and not report.get("frozen_test_split_intact"):
+        failures.append("the test split is not frozen or has changed")
     if suite == "e2e":
+        if not report.get("products_with_fixable_findings") or not report.get("applied"):
+            failures.append("the pipeline run processed nothing, so its invariants prove nothing")
         for name in gates["e2e"]["must_hold"]:
             if not report["invariants"].get(name):
                 failures.append(f"invariant failed: {name}")
