@@ -31,7 +31,7 @@ That drives the same flow over HTTP against the running stack.
 | RAG | **Ran for real**, on 19 chunks of invented policy, with lexical hashed embeddings, not a semantic model |
 | CI workflow | **Written, not run.** Each job's commands ran locally, but it has never run on GitHub, because no repo exists yet |
 | Hosted LLM provider and judge | **Written, not run.** Tested against a fake client. No key was available, so no model has been called |
-| Agent accuracy, cost, latency | **Not measured.** Needs a key: `python -m gatekeeper_eval agent` |
+| Agent behaviour, cost, latency | **Not measured.** Needs a key: `python -m gatekeeper_eval agent`. Repair quality has no automatic score, even with a key |
 | Live Shopify adapter | **Written, not run.** Tested against a mocked GraphQL server only. It has never called a store |
 | Terraform for ECS and RDS | **Validated with `terraform validate`, never applied** |
 
@@ -84,36 +84,46 @@ On Windows use `.venv\Scripts\activate`. Tests use real Postgres, not mocks. Cov
 - Reviewer tokens have no rate limit or expiry. Put a WAF or a CIDR rule in front before real use.
 - Rules are English word lists, so they miss paraphrases and can false-block plain English.
 - Only the first 25 variants and 10 media of a product are read from a live store.
+- The live adapter takes one Admin API token and does not refresh it. Shopify's client-credentials tokens last 24 hours.
 - The eval data is synthetic. Its author also wrote the rules.
 
 ## Steps only the owner can do
 
 Everything above runs without these. Each one needs an account, a key or spending approval.
 
-**1. Publish the repo (needs your yes, because a public repo cannot be taken back).**
+**1. Publish the repo (needs your yes, because a public repo cannot be taken back).** Commits show the author email in `git log`.
 ```bash
 gh repo create catalog-gatekeeper --public --source . --push
 ```
 Then enable secret push protection in the repo's settings. CI runs on the first push; fix anything it finds before citing it.
 
-**2. Measure the agent with a real model (spends money, capped by `DAILY_COST_CAP_USD`, default 5 USD).** Create an API key with the hosted LLM provider, with a spend limit, then:
+**2. Measure the agent with a real model (spends money).** Create an API key with the hosted LLM provider and set a spend limit in its console. That limit is the real cap: `DAILY_COST_CAP_USD` (default 5 USD) counts only the current run, because each run starts with an empty eval database. One run makes 40 agent runs, each capped at 0.25 USD.
+
+Start only the database, and set the key only in this shell. A key visible to a full `docker compose up` switches the demo to the hosted LLM, and it runs up to 16 products on its own.
 ```bash
+docker compose up -d db
 export ANTHROPIC_API_KEY=...   # PowerShell: $env:ANTHROPIC_API_KEY="..."
-docker compose down -v && docker compose up --build
+export DAILY_COST_CAP_USD=1    # PowerShell: $env:DAILY_COST_CAP_USD="1"
 python -m gatekeeper_eval agent --split dev
 ```
-Read the report in `eval/reports/`. This is the first run of the real provider, so expect to fix something.
+Use the virtual environment from "Tests" above. The sweep stops after 3 runs in a row raise an error, so a bad key costs nothing. Status `FAILED` means no run finished, and `PARTIAL` means it stopped early. Do not quote either. If the first run reaches the 1 USD cap, raise the cap and run again.
 
-**3. Try a real development store (free, reads first).** Sign up at partners.shopify.com, create a development store, create a custom app with `read_products` and `write_products`, and copy its Admin API token and client secret.
+The report in `eval/reports/` gives run outcomes, validator results, citation checks, cost and latency. It does not score repair quality, so read `per_case`, above all the 10 injection cases. `injected_phrase_copied` only detects verbatim copying. This is the first run of the real provider, so expect to fix something.
+
+**3. Try a real development store (free, reads first).** Shopify no longer lets you create a custom app with a permanent token in the store admin. Create the store and the app in the same organization at https://dev.shopify.com/dashboard/: Stores, Create store, Dev. Then Apps, Create app, Start from Dev Dashboard, with scopes `read_products` and `write_products`. Release a version, install it on the store, and copy the client ID and secret from Credentials. The token below lasts 24 hours, and this app does not refresh it, so fetch a new one and restart when it expires.
 ```bash
+docker compose up -d db
+export CLIENT_ID=... CLIENT_SECRET=...
+export SHOPIFY_ACCESS_TOKEN=$(curl -s -X POST https://your-store.myshopify.com/admin/oauth/access_token -d grant_type=client_credentials -d client_id=$CLIENT_ID -d client_secret=$CLIENT_SECRET | python -c "import json,sys;print(json.load(sys.stdin)['access_token'])")
+export DATABASE_URL=postgresql://gatekeeper:local-demo-owner@127.0.0.1:54329/gatekeeper
 export SHOPIFY_ADAPTER=live SHOPIFY_SHOP_DOMAIN=your-store.myshopify.com
-export SHOPIFY_ACCESS_TOKEN=... SHOPIFY_WEBHOOK_SECRET=... WRITEBACK_ENABLED=0 DEMO_MODE=0
+export SHOPIFY_WEBHOOK_SECRET=$CLIENT_SECRET WRITEBACK_ENABLED=0 DEMO_MODE=0
 export REVIEWER_TOKENS="you:admin:$(python -c 'import hashlib,sys;print(hashlib.sha256(sys.argv[1].encode()).hexdigest())' YOUR_LONG_RANDOM_TOKEN)"
 python -m gatekeeper.seed && uvicorn gatekeeper.api.app:create_app --factory --port 8000
 ```
-Keep writes off at first. Save real responses as new fixtures, compare them with the mock in `tests/integration/test_shopify_adapters.py`, then turn on `WRITEBACK_ENABLED=1` and `POST /api/admin/writeback`. Register webhooks for `products/update`, `products/create` and `products/delete` pointing at `/webhooks/shopify`.
+This serves the API only. Agent runs also need `python -m gatekeeper.worker` in a second shell with the same variables, and `/readyz` returns 503 until the worker is running. Keep writes off at first. Save real responses as new fixtures, compare them with the mock in `tests/integration/test_shopify_adapters.py`, then turn on `WRITEBACK_ENABLED=1` and `POST /api/admin/writeback`. Webhooks need a public HTTPS address, so register `products/update`, `products/create` and `products/delete` at `/webhooks/shopify` only once you have one.
 
-**4. Deploy to AWS (spends money every month, about one small RDS instance, one load balancer and two Fargate tasks).** Create an S3 state bucket and an ACM certificate, then:
+**4. Deploy to AWS (spends money every month, about one small RDS instance, one load balancer and two Fargate tasks).** The HTTPS listener needs an ACM certificate, and that needs a domain you control. A live store also needs token refresh first, because the 24-hour token in step 3 would stop working a day after deploy. Create an S3 state bucket and the certificate, then:
 ```bash
 cd infra/terraform
 terraform init -backend-config="bucket=YOUR_BUCKET" -backend-config="key=gatekeeper.tfstate" -backend-config="region=ca-central-1"

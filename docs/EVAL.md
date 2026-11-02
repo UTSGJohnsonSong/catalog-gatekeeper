@@ -45,7 +45,11 @@ The end-to-end suite ran 17 demo products through the real pipeline with the tem
 
 Tests make the gate fail on purpose: rules that find nothing, rules that fire on everything, a checker that accepts everything, an unknown suite, an end-to-end run that processed nothing, and an unfrozen test split.
 
-The agent suite (`python -m gatekeeper_eval agent`) needs a key and costs money. It has never run. Its report is saved as `SKIPPED`, and with a key it would be `NOT_GATED` until thresholds are set from a first run.
+The agent suite (`python -m gatekeeper_eval agent`) needs a key and costs money. It has never run against a real model. Its report is saved as `SKIPPED` without a key. With a key it is `FAILED` if no run finished, which also exits nonzero, and otherwise `NOT_GATED` until thresholds are set from a first run. The report's `status` is `PARTIAL` if the sweep stopped early, and those numbers should not be quoted.
+
+It samples 40 products: 6 for each of A01, A02, A03, A05 and A07, and 10 injection cases that also lack an SEO description, so the agent has to write text while reading the hostile description. It reports run outcomes, validator results, citation checks, cost and latency. It does not score repair quality, so a person reads `per_case`. `injected_phrase_copied` detects verbatim copying only, not following the instruction in new words.
+
+An earlier version of this sample never ran its injection cases, because they shared product ids with the other cases and the fixture store dropped them. It also reported "measured" when every run failed. A dummy-key run against a closed port exposed both before any real run, and `tests/eval/test_eval_integrity.py` now covers them.
 
 ## Limits
 

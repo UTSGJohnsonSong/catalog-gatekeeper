@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import ast
 import json
+from collections import Counter
 from pathlib import Path
 
 import pytest
 import yaml
 
+from gatekeeper.llm.heuristic import HeuristicProvider
+from gatekeeper.llm.port import LLMError
 from gatekeeper.rules import spec
 from gatekeeper_eval import freeze as freezer
 from gatekeeper_eval import gates
+from gatekeeper_eval.__main__ import main as cli_main
 from gatekeeper_eval.generator import base_products
 from gatekeeper_eval.generator.build import OUT, build_policy_qa, chunk_sentence_rows
 from gatekeeper_eval.generator.invariants import check_base
@@ -25,7 +29,17 @@ from gatekeeper_eval.metrics import (
     score_rules,
     wilson,
 )
-from gatekeeper_eval.runner import run_agent_live, run_audit, run_citations, run_validators_suite
+from gatekeeper_eval.runner import (
+    AGENT_CASES_PER_RULE,
+    AGENT_INJECTION_CASES,
+    AGENT_MAX_CONSECUTIVE_RAISES,
+    AGENT_REPAIR_RULES,
+    run_agent_live,
+    run_audit,
+    run_citations,
+    run_validators_suite,
+    select_agent_cases,
+)
 
 GENERATOR = Path(base_products.__file__).parent
 ROOT = Path(__file__).resolve().parents[2]
@@ -134,6 +148,52 @@ class TestHonesty:
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         report = run_agent_live("dev")
         assert report["status"] == "SKIPPED" and report["agent_metrics"] is None
+
+    def test_agent_sample_covers_every_group_with_distinct_products(self):
+        cases = select_agent_cases("dev")
+        groups = Counter(c["group"] for c in cases)
+        assert groups == {**dict.fromkeys(AGENT_REPAIR_RULES, AGENT_CASES_PER_RULE), "injection": AGENT_INJECTION_CASES}
+        assert len({c["product"]["gid"] for c in cases}) == len(cases), "a repeated gid would drop the case silently"
+        assert len({c["product"]["handle"] for c in cases}) == len(cases)
+
+    def test_injection_cases_give_the_agent_something_to_repair(self):
+        injected = [c for c in select_agent_cases("dev") if c["group"] == "injection"]
+        for case in injected:
+            assert case["injected_phrase"] in case["product"]["description_html"]
+            assert case["product"]["seo_description"] == ""
+
+    def test_agent_suite_runs_every_planned_case_through_the_pipeline(self, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-not-a-real-key")
+        monkeypatch.setattr("gatekeeper.context.build_provider", lambda settings: (HeuristicProvider(), None))
+        report = run_agent_live("dev")
+        planned = report["cases_planned"]
+        assert planned == len(AGENT_REPAIR_RULES) * AGENT_CASES_PER_RULE + AGENT_INJECTION_CASES
+        assert report["agent_metrics"]["runs"] == planned == len(report["per_case"])
+        assert report["agent_metrics"]["injection"]["runs"] == AGENT_INJECTION_CASES
+        assert report["status"] == "RAN", report["agent_metrics"]["runs_that_raised"]
+
+    def test_all_runs_failing_is_a_failure_and_stops_the_sweep(self, monkeypatch):
+        class BadKey(HeuristicProvider):
+            def create(self, **kwargs):
+                raise LLMError("authentication failed", retryable=False)
+
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-not-a-real-key")
+        monkeypatch.setattr("gatekeeper.context.build_provider", lambda settings: (BadKey(), None))
+        report = run_agent_live("dev")
+        assert report["status"] == "FAILED"
+        assert report["agent_metrics"]["runs"] == AGENT_MAX_CONSECUTIVE_RAISES
+        assert report["agent_metrics"]["stopped_early"] is True
+        assert "authentication failed" in report["agent_metrics"]["runs_that_raised"][0]
+
+    def test_failed_agent_report_exits_nonzero_and_does_not_claim_a_measurement(self, monkeypatch, capsys, tmp_path):
+        monkeypatch.setattr(
+            "gatekeeper_eval.runner.run_agent_live",
+            lambda split: {"suite": "agent", "split": split, "status": "FAILED", "agent_metrics": {"runs": 3}},
+        )
+        monkeypatch.setattr("gatekeeper_eval.__main__.REPORTS", tmp_path / "eval" / "reports")
+        monkeypatch.setattr("sys.argv", ["gatekeeper_eval", "agent", "--split", "dev"])
+        assert cli_main() == 1
+        assert "NOT MEASURED" in capsys.readouterr().out
 
     def test_plumbing_report_cannot_carry_agent_metrics(self):
         report = {

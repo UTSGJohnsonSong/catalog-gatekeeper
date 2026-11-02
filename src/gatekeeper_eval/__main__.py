@@ -26,6 +26,12 @@ LIMITS = [
     "With about 30 positives per rule, per-rule intervals are wide.",
     "These numbers measure rules against their specification, not against real merchants or a real LLM.",
 ]
+AGENT_VERDICTS = {
+    "SKIPPED": "Agent behaviour: NOT MEASURED (no ANTHROPIC_API_KEY).",
+    "FAILED": "Agent behaviour: NOT MEASURED (no run finished). See runs_that_raised in the report.",
+    "PARTIAL": "Agent behaviour: PARTLY MEASURED (the sweep stopped early). Do not quote these numbers.",
+    "RAN": "Agent behaviour measured against a real model. Repair quality is not scored: read per_case in the report.",
+}
 
 
 def _git_sha() -> str:
@@ -128,15 +134,13 @@ def main() -> int:
     }
     if args.command == "agent":
         report = runner.run_agent_live(args.split)
-        print(f"agent ({args.split}): {report.get('status')}: {_summary(report)}")
-        print(
-            "Agent accuracy: NOT MEASURED (no ANTHROPIC_API_KEY)"
-            if report.get("status") == "SKIPPED"
-            else "Agent accuracy measured against a real model."
-        )
+        status = report["status"]
+        print(f"agent ({args.split}): {status}: {_summary(report)}")
+        print(AGENT_VERDICTS[status])
         # There is no agent gate yet, so this report must never read as a pass.
-        _save(report, command_line, [], gate="SKIPPED" if report.get("status") == "SKIPPED" else "NOT_GATED")
-        return 0
+        path = _save(report, command_line, [], gate=status if status in {"SKIPPED", "FAILED"} else "NOT_GATED")
+        print(f"  report: {path.relative_to(REPORTS.parents[1])}")
+        return 1 if status == "FAILED" else 0
     chosen = list(suites) if args.command == "all" else [args.command]
     failed = False
     for name in chosen:
