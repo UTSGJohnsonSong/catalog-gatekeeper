@@ -2,11 +2,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ProposalDetail, ValidationRow } from "./api/client";
-import { ModeBanner } from "./App";
+import { MemoryRouter } from "react-router-dom";
+import { App, ModeBanner } from "./App";
 import { DecisionBar } from "./components/DecisionBar";
 import { DiffPanel } from "./components/DiffPanel";
 import { Gate } from "./components/Gate";
 import { CHECK_IDS, GateStrip } from "./components/GateStrip";
+import { LoginPage } from "./pages/Other";
 
 const row = (rule_id: string, passed = true, severity = "block"): ValidationRow => ({
   rule_id,
@@ -192,6 +194,57 @@ describe("honest labels", () => {
   it("does not go quiet when the mode cannot be loaded", async () => {
     banner(null);
     await waitFor(() => expect(screen.getByText(/Could not confirm which model/)).toBeInTheDocument());
+  });
+
+  it("warns that a public demo is shared and resets", async () => {
+    banner({ ...demo, public_demo: true, demo_token: "demo-reviewer", demo_reset_minutes: 60 });
+    await waitFor(() => expect(screen.getByText(/other visitors see what you do/)).toBeInTheDocument());
+    expect(screen.getByText(/resets every 60 minutes/)).toBeInTheDocument();
+  });
+});
+
+describe("sign-in wiring", () => {
+  it("fills in the token the server names, once the server has said it", async () => {
+    const meta = {
+      demo_mode: true,
+      public_demo: true,
+      demo_token: "demo-reviewer",
+      demo_reset_minutes: 60,
+      model_mode: "demo",
+      model: "heuristic-v1",
+      provider: "heuristic",
+      shopify_adapter: "fixture",
+      judge: "disabled",
+      writeback_env_enabled: true,
+      writeback_shop_enabled: true,
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        String(url).includes("/api/meta") ? new Response(JSON.stringify(meta), { status: 200 }) : new Response("{}", { status: 401 }),
+      ),
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <App />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByLabelText("Reviewer token")).toHaveValue("demo-reviewer"));
+  });
+});
+
+describe("sign-in", () => {
+  it("fills in the token the server offers, and nothing when it offers none", () => {
+    const { unmount } = render(<LoginPage demoToken="demo-reviewer" onDone={() => undefined} />);
+    expect(screen.getByLabelText("Reviewer token")).toHaveValue("demo-reviewer");
+    expect(screen.getByText(/accepts the filled-in token/)).toBeInTheDocument();
+    unmount();
+    render(<LoginPage demoToken={null} onDone={() => undefined} />);
+    expect(screen.getByLabelText("Reviewer token")).toHaveValue("");
+    expect(screen.queryByText(/accepts the filled-in token/)).not.toBeInTheDocument();
   });
 });
 

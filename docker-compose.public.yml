@@ -1,0 +1,51 @@
+# A local rehearsal of the free public demo: one container runs setup, the API and the worker, as on a free host.
+# It has its own project and database, so it never touches the normal demo. Values below are local demo values.
+#   docker compose -f docker-compose.public.yml up -d --build --wait && python scripts/smoke_public.py
+name: catalog-gatekeeper-public
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: gatekeeper
+      POSTGRES_PASSWORD: local-public-owner
+      POSTGRES_DB: gatekeeper
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gatekeeper -d gatekeeper"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  demo:
+    build: .
+    image: catalog-gatekeeper:local
+    command: ["python", "-m", "gatekeeper.allinone"]
+    # No model key is passed through, whatever the shell holds: a public demo refuses to boot with one.
+    environment:
+      DATABASE_URL: postgresql://gatekeeper:local-public-owner@db:5432/gatekeeper
+      APP_DB_PASSWORD: local-public-app
+      PUBLIC_DEMO: "1"
+      DEMO_MODE: "1"
+      DEMO_AUTORUN: "16"
+      DEMO_RESET_MINUTES: "60"
+      WRITEBACK_ENABLED: "1"
+      SHOPIFY_ADAPTER: fixture
+      SHOPIFY_WEBHOOK_SECRET: local-public-webhook-secret
+      LLM_PROVIDER: heuristic
+      # Docker's port mapping is not an HTTP proxy and adds no X-Forwarded-For, so nothing in front is trusted.
+      TRUSTED_PROXY_HOPS: "0"
+      ALLOWED_HOSTS: "127.0.0.1,localhost"
+      FIXTURES_DIR: /app/fixtures
+      STATIC_DIR: /app/static
+      PORT: "8000"
+    ports:
+      - "127.0.0.1:8001:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/readyz', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 10s

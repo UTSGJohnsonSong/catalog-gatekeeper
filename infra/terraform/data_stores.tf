@@ -39,7 +39,7 @@ locals {
     "database-url-migrate",
     "app-db-password",
     "mcp-db-password",
-    "shopify-access-token",
+    "shopify-client-secret",
     "shopify-webhook-secret",
     "anthropic-api-key",
     "reviewer-tokens",

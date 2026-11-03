@@ -1,0 +1,4 @@
+$ terraform fmt -check -recursive && terraform validate   (2026-11-03T08:40:28Z, Terraform v1.16.6)
+Success! The configuration is valid.
+
+exit=0

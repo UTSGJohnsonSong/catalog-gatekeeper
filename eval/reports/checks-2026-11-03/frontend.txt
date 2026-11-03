@@ -1,0 +1,39 @@
+$ npm run typecheck && npm test && npm run build   (2026-11-03T08:40:21Z)
+
+> catalog-gatekeeper-ui@0.1.0 typecheck
+> tsc --noEmit
+
+
+> catalog-gatekeeper-ui@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.5 <repo>/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  25 passed (25)
+   Start at  03:40:24
+   Duration  1.83s (environment 63%, tests 17%, setup 10%, import 7%, transform 2%)
+
+
+> catalog-gatekeeper-ui@0.1.0 build
+> tsc --noEmit && vite build
+
+[36mvite v8.3.5 [32mbuilding client environment for production...[36m[39m
+transforming...
+✓ 97 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                                       0.40 kB │ gzip:   0.26 kB
+dist/assets/familjen-grotesk-vietnamese-wght-normal-DKRsWTd7.woff2    6.29 kB
+dist/assets/newsreader-vietnamese-wght-normal-Czsa-EzN.woff2         11.93 kB
+dist/assets/familjen-grotesk-latin-ext-wght-normal-Cvgdx4cy.woff2    15.46 kB
+dist/assets/familjen-grotesk-latin-wght-normal-CfZa4wxB.woff2        18.91 kB
+dist/assets/newsreader-latin-ext-wght-normal-C-3rgBeH.woff2          36.24 kB
+dist/assets/newsreader-latin-wght-normal-CCVVNp6i.woff2              58.08 kB
+dist/assets/index-DsWpNbqO.css                                        9.17 kB │ gzip:   2.71 kB
+dist/assets/index-C01LwM5E.js                                       320.73 kB │ gzip: 101.03 kB
+
+[32m✓ built in 210ms[39m
+exit=0

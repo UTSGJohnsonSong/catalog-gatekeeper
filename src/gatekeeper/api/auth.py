@@ -26,7 +26,10 @@ def _sha256(value: str) -> str:
 
 
 def load_tokens(settings: Settings) -> list[tuple[str, str, str]]:
-    """Returns (sha256, name, role). Demo tokens exist only with DEMO_MODE on and nothing configured."""
+    """Returns (sha256, name, role). Demo tokens exist only with DEMO_MODE on and nothing configured.
+
+    A public demo is the exception: it always accepts the reviewer demo token, next to any configured tokens, and
+    never the admin one, because the sign-in page shows the demo token to every visitor."""
     raw = settings.reviewer_tokens.get_secret_value().strip() if settings.reviewer_tokens else ""
     entries: list[tuple[str, str, str]] = []
     for item in filter(None, (part.strip() for part in raw.split(","))):
@@ -34,9 +37,22 @@ def load_tokens(settings: Settings) -> list[tuple[str, str, str]]:
         if len(parts) != 3 or parts[1] not in ("reviewer", "admin") or len(parts[2]) != 64:
             raise ValueError("REVIEWER_TOKENS entries must look like name:role:sha256hex")
         entries.append((parts[2].lower(), parts[0], parts[1]))
-    if not entries and settings.demo_mode:
+    if settings.public_demo:
+        name, role = DEMO_TOKENS["demo-reviewer"]
+        entries.append((_sha256("demo-reviewer"), name, role))
+    elif not entries and settings.demo_mode:
         entries = [(_sha256(token), name, role) for token, (name, role) in DEMO_TOKENS.items()]
     return entries
+
+
+def demo_token(settings: Settings) -> str | None:
+    """The token the sign-in page may fill in, or None when no demo token is accepted."""
+    if settings.public_demo:
+        return "demo-reviewer"
+    configured = settings.reviewer_tokens and settings.reviewer_tokens.get_secret_value().strip()
+    if settings.demo_mode and not configured:
+        return "demo-admin"
+    return None
 
 
 def current_principal(

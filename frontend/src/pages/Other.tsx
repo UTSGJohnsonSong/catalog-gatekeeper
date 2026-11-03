@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { ApiError, api, setToken } from "../api/client";
 
-export function LoginPage({ demo, onDone }: { demo: boolean; onDone: () => void }) {
-  const [value, setValue] = useState(demo ? "demo-admin" : "");
+export function LoginPage({ demoToken, onDone }: { demoToken: string | null; onDone: () => void }) {
+  const demo = demoToken !== null;
+  const [value, setValue] = useState(demoToken ?? "");
   const [error, setError] = useState<string | null>(null);
 
   async function submit(event: FormEvent) {
@@ -98,6 +99,7 @@ export function ProductsPage() {
 
 export function ActivityPage() {
   const { data, error, isLoading } = useQuery({ queryKey: ["audit"], queryFn: api.auditLog, refetchInterval: 5000 });
+  const { data: meta } = useQuery({ queryKey: ["meta"], queryFn: api.meta });
   if (isLoading) return <p className="hint">Loading activity.</p>;
   if (error) {
     return (
@@ -110,6 +112,11 @@ export function ActivityPage() {
     <>
       <h1>Activity</h1>
       <p className="hint">Every status change and decision. This log cannot be edited, even by the application.</p>
+      {meta?.public_demo && (
+        <p className="hint">
+          This shared demo clears the log, with everything else, every {meta.demo_reset_minutes} minutes and on each restart.
+        </p>
+      )}
       <div className="table-wrap">
         <table>
           <thead>

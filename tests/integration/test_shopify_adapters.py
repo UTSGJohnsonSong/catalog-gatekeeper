@@ -10,7 +10,7 @@ import pytest
 
 from gatekeeper.domain.product import content_hash
 from gatekeeper.shopify.fixture import FixtureShopify
-from gatekeeper.shopify.live import LiveShopify
+from gatekeeper.shopify.live import ClientCredentialsToken, LiveShopify
 from gatekeeper.shopify.mapper import money, product_from_node, update_input
 from gatekeeper.shopify.port import (
     ShopifyAuthError,
@@ -60,8 +60,13 @@ class FakeAdminGraphQL:
         self.requests: list[dict[str, Any]] = []
         self.next_responses: list[httpx.Response] = []
         self.user_errors: list[dict[str, Any]] = []
+        self.tokens_issued = 0
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/admin/oauth/access_token":
+            # The client credentials grant: a form post, answered with a fresh 24-hour token.
+            self.tokens_issued += 1
+            return httpx.Response(200, json={"access_token": f"tok-{self.tokens_issued}", "expires_in": 86399})
         body = json.loads(request.content)
         self.requests.append({"headers": dict(request.headers), "url": str(request.url), **body})
         if self.next_responses:
@@ -125,9 +130,25 @@ def make_live(fake, **kwargs) -> LiveShopify:
     )
 
 
-@pytest.fixture(params=["fixture", "live"])
+def make_live_with_client_credentials(fake) -> LiveShopify:
+    transport = httpx.MockTransport(fake)
+    tokens = ClientCredentialsToken(
+        shop_domain="demo.myshopify.com", client_id="client", client_secret="secret", transport=transport
+    )
+    return LiveShopify(
+        shop_domain="demo.myshopify.com",
+        api_version="2026-10",
+        token_source=tokens,
+        writes_enabled=True,
+        transport=transport,
+    )
+
+
+@pytest.fixture(params=["fixture", "live", "live-client-credentials"])
 def adapter(request, store, fake):
-    return store if request.param == "fixture" else make_live(fake)
+    if request.param == "fixture":
+        return store
+    return make_live(fake) if request.param == "live" else make_live_with_client_credentials(fake)
 
 
 class TestContract:
@@ -190,6 +211,16 @@ class TestLiveOnly:
         fake.next_responses = [httpx.Response(status, json={})]
         with pytest.raises(ShopifyAuthError):
             make_live(fake).get_product("g")
+
+    def test_a_write_refused_with_401_is_retried_once_and_applied_once(self, store, fake):
+        store.load_catalog([make_product("gid://shopify/Product/1").to_dict()])
+        live = make_live_with_client_credentials(fake)
+        fake.next_responses = [httpx.Response(401, json={"errors": "expired"})]
+        result = live.update_product("gid://shopify/Product/1", {"seo_title": "Better title"})
+        assert not result.user_errors and result.product.seo_title == "Better title"
+        assert store.update_calls == 1
+        assert fake.tokens_issued == 2
+        assert [r["headers"]["x-shopify-access-token"] for r in fake.requests] == ["tok-1", "tok-2"]
 
     def test_429_honours_retry_after(self, fake):
         fake.next_responses = [httpx.Response(429, headers={"Retry-After": "7"}, json={})]

@@ -49,13 +49,15 @@ locals {
     { name = "LLM_PROVIDER", value = "anthropic" },
     { name = "SHOPIFY_ADAPTER", value = "live" },
     { name = "SHOPIFY_SHOP_DOMAIN", value = var.shop_domain },
+    # The client credentials grant gives 24-hour tokens. The adapter asks for a new one before each expires.
+    { name = "SHOPIFY_CLIENT_ID", value = var.shopify_client_id },
     { name = "WRITEBACK_ENABLED", value = tostring(var.writeback_enabled) },
     { name = "STATIC_DIR", value = "/app/static" },
     { name = "FIXTURES_DIR", value = "/app/fixtures" },
   ]
   app_secrets = [
     { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.app["database-url-app"].arn },
-    { name = "SHOPIFY_ACCESS_TOKEN", valueFrom = aws_secretsmanager_secret.app["shopify-access-token"].arn },
+    { name = "SHOPIFY_CLIENT_SECRET", valueFrom = aws_secretsmanager_secret.app["shopify-client-secret"].arn },
     { name = "SHOPIFY_WEBHOOK_SECRET", valueFrom = aws_secretsmanager_secret.app["shopify-webhook-secret"].arn },
     { name = "ANTHROPIC_API_KEY", valueFrom = aws_secretsmanager_secret.app["anthropic-api-key"].arn },
     { name = "REVIEWER_TOKENS", valueFrom = aws_secretsmanager_secret.app["reviewer-tokens"].arn },
@@ -122,7 +124,7 @@ resource "aws_ecs_task_definition" "migrate" {
       { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.app["database-url-migrate"].arn },
       { name = "APP_DB_PASSWORD", valueFrom = aws_secretsmanager_secret.app["app-db-password"].arn },
       { name = "MCP_DB_PASSWORD", valueFrom = aws_secretsmanager_secret.app["mcp-db-password"].arn },
-      { name = "SHOPIFY_ACCESS_TOKEN", valueFrom = aws_secretsmanager_secret.app["shopify-access-token"].arn },
+      { name = "SHOPIFY_CLIENT_SECRET", valueFrom = aws_secretsmanager_secret.app["shopify-client-secret"].arn },
       { name = "SHOPIFY_WEBHOOK_SECRET", valueFrom = aws_secretsmanager_secret.app["shopify-webhook-secret"].arn },
       { name = "ANTHROPIC_API_KEY", valueFrom = aws_secretsmanager_secret.app["anthropic-api-key"].arn },
       { name = "REVIEWER_TOKENS", valueFrom = aws_secretsmanager_secret.app["reviewer-tokens"].arn },

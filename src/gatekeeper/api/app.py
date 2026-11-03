@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -18,7 +19,16 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from gatekeeper import jobs
 from gatekeeper.api import schemas
-from gatekeeper.api.auth import Principal, current_principal, load_tokens, require_admin
+from gatekeeper.api.auth import Principal, current_principal, demo_token, load_tokens, require_admin
+from gatekeeper.api.limits import (
+    LOOPBACK,
+    SAFE_METHODS,
+    BodySizeLimit,
+    RateLimiter,
+    bucket_key,
+    client_ip,
+    forwarded_entries,
+)
 from gatekeeper.config import Settings, get_settings
 from gatekeeper.context import AppContext, build_context
 from gatekeeper.db import tx
@@ -34,6 +44,7 @@ from gatekeeper.worker import configure_logging
 
 log = logging.getLogger("gatekeeper.api")
 MAX_WEBHOOK_BYTES = 5 * 1024 * 1024
+ADDRESS_CHECKS_LOGGED = 5
 JUDGE_NAMES = {
     "J00": "JUDGE_UNAVAILABLE",
     "J01": "JUDGE_UNSUPPORTED_CLAIM",
@@ -60,18 +71,72 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
             app.state.ctx.pool.close()
 
     in_production = settings.env == "production"
+    hide_docs = in_production or settings.public_demo
     app = FastAPI(
         title="Catalog Gatekeeper",
         version="0.1.0",
         lifespan=lifespan,
-        docs_url=None if in_production else "/docs",
-        redoc_url=None if in_production else "/redoc",
-        openapi_url=None if in_production else "/openapi.json",
+        docs_url=None if hide_docs else "/docs",
+        redoc_url=None if hide_docs else "/redoc",
+        openapi_url=None if hide_docs else "/openapi.json",
     )
     if settings.allowed_hosts:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=[h.strip() for h in settings.allowed_hosts.split(",")])
     app.state.tokens = load_tokens(settings)
     app.state.settings = settings
+    # Middleware added later wraps what came before, so security headers stay outermost and cover 413 and 429 too.
+    # A public demo has no real webhooks, so its webhook route gets the small cap as well.
+    app.add_middleware(
+        BodySizeLimit,
+        max_bytes=settings.max_request_bytes,
+        exempt_prefix=None if settings.public_demo else "/webhooks/",
+    )
+
+    if settings.public_demo:
+        # Changes and reads have separate budgets. Reads are capped too, because each one costs the free database.
+        writes = (RateLimiter(settings.rate_limit_per_minute), RateLimiter(settings.rate_limit_global_per_minute))
+        reads = (RateLimiter(settings.read_limit_per_minute), RateLimiter(settings.read_limit_global_per_minute))
+
+        # What the deployer needs to check TRUSTED_PROXY_HOPS, without logging anyone's address: how many entries
+        # X-Forwarded-For carried, for the first requests after boot. docs/DEPLOY_DEMO.md explains the reading.
+        watch = {"shown": 0, "short_chain_warned": False, "busy_logged_at": -3600.0}
+
+        def too_many(limiter: RateLimiter, message: str) -> JSONResponse:
+            return JSONResponse(
+                {"detail": f"{message} Wait a moment and try again."},
+                status_code=429,
+                headers={"Retry-After": str(limiter.retry_after())},
+            )
+
+        @app.middleware("http")
+        async def rate_limit(request: Request, call_next: Any) -> Response:
+            path = request.url.path
+            peer = request.client.host if request.client else None
+            # Every X-Forwarded-For line, in order: a proxy may add its own line instead of extending the first.
+            forwarded = ", ".join(request.headers.getlist("x-forwarded-for")) or None
+            # The demo's own simulated edit reaches the webhook over loopback with no proxy header. It is not a visitor.
+            internal = forwarded is None and peer in LOOPBACK
+            if not internal and path != "/healthz" and not path.startswith("/assets/"):
+                hops, entries = settings.trusted_proxy_hops, len(forwarded_entries(forwarded))
+                if watch["shown"] < ADDRESS_CHECKS_LOGGED:
+                    watch["shown"] += 1
+                    log.info(
+                        "client address check: X-Forwarded-For has %d entries, TRUSTED_PROXY_HOPS=%d", entries, hops
+                    )
+                if 0 < entries < hops and not watch["short_chain_warned"]:
+                    watch["short_chain_warned"] = True
+                    log.warning(
+                        "X-Forwarded-For had fewer entries than TRUSTED_PROXY_HOPS; such requests share a bucket"
+                    )
+                per_client, overall = reads if request.method in SAFE_METHODS else writes
+                if not per_client.allow(bucket_key(client_ip(peer, forwarded, hops))):
+                    return too_many(per_client, "Too many requests from this address.")
+                if not overall.allow("*"):
+                    if time.monotonic() - watch["busy_logged_at"] >= 60:
+                        watch["busy_logged_at"] = time.monotonic()
+                        log.warning("the demo-wide rate limit was reached; every visitor is refused for now")
+                    return too_many(overall, "The demo is busy.")
+            return cast(Response, await call_next(request))
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next: Any) -> Response:
@@ -79,7 +144,8 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Frame-Options"] = "DENY"
-        if in_production:
+        # A public demo is only reachable through the host's HTTPS proxy.
+        if in_production or settings.public_demo:
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; frame-ancestors 'none'; "
@@ -125,6 +191,9 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
             shop = conn.execute("SELECT writeback_enabled FROM shops WHERE id = %s", (ctx_.shop_id,)).fetchone()
         return schemas.Meta(
             demo_mode=settings.demo_mode,
+            public_demo=settings.public_demo,
+            demo_token=demo_token(settings),
+            demo_reset_minutes=settings.demo_reset_minutes if settings.public_demo else 0,
             model_mode=ctx_.provider.mode,
             model=ctx_.provider.model,
             provider=ctx_.provider.name,

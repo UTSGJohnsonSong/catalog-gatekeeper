@@ -15,6 +15,9 @@ export function ModeBanner() {
   if (meta.model_mode === "demo") notes.push("Demo model: fixes come from a template script, not an LLM.");
   if (meta.shopify_adapter === "fixture") notes.push("The store is simulated.");
   if (meta.demo_mode) notes.push("Demo sign-in is on.");
+  if (meta.public_demo) {
+    notes.push(`This is a shared sandbox: other visitors see what you do, and it resets every ${meta.demo_reset_minutes} minutes.`);
+  }
   if (!meta.writeback_shop_enabled || !meta.writeback_env_enabled) notes.push("Writing to the store is switched off.");
   if (notes.length === 0) return null;
   return <p className="mode-banner">{notes.join(" ")}</p>;
@@ -60,7 +63,7 @@ export function App() {
       </header>
       <main>
         {!signedIn ? (
-          <LoginPage demo={Boolean(meta?.demo_mode)} key={String(meta?.demo_mode)} onDone={() => setSignedIn(true)} />
+          <LoginPage demoToken={meta?.demo_token ?? null} key={String(meta?.demo_token)} onDone={() => setSignedIn(true)} />
         ) : (
           <Routes>
             <Route path="/" element={<QueuePage />} />

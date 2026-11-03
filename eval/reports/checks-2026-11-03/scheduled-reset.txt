@@ -1,0 +1,9 @@
+$ docker logs catalog-gatekeeper-public-demo-1 | grep -E 'worker started|demo reset|catalog restored|demo agent runs queued|exited with|Traceback'   (2026-11-03T09:11:55Z; DEMO_RESET_MINUTES=5 for this run; the public smoke test ran between the two resets)
+{"at": "2026-11-03 09:06:44,664", "level": "INFO", "logger": "gatekeeper.seed", "msg": "demo tables emptied and catalog restored: 40 products"}
+{"at": "2026-11-03 09:06:44,774", "level": "INFO", "logger": "gatekeeper.seed", "msg": "demo agent runs queued: 16"}
+{"at": "2026-11-03 09:06:44,777", "level": "INFO", "logger": "gatekeeper.seed", "msg": "demo reset"}
+{"at": "2026-11-03 09:06:46,155", "level": "INFO", "logger": "gatekeeper.worker", "msg": "worker started: provider=heuristic mode=demo adapter=fixture"}
+{"at": "2026-11-03 09:11:44,813", "level": "INFO", "logger": "gatekeeper.seed", "msg": "demo tables emptied and catalog restored: 40 products"}
+{"at": "2026-11-03 09:11:44,901", "level": "INFO", "logger": "gatekeeper.seed", "msg": "demo agent runs queued: 16"}
+{"at": "2026-11-03 09:11:44,905", "level": "INFO", "logger": "gatekeeper.seed", "msg": "demo reset"}
+{"at": "2026-11-03 09:11:46,174", "level": "INFO", "logger": "gatekeeper.worker", "msg": "worker started: provider=heuristic mode=demo adapter=fixture"}

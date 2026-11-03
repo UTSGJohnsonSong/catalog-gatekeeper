@@ -112,8 +112,10 @@ jobs:
       - run: pip install -e .
       - run: docker compose up -d --wait --build
       - run: python scripts/smoke.py
+      - name: The free hosting layout, one container in public demo mode
+        run: docker compose -f docker-compose.public.yml up -d --wait --build && python scripts/smoke_public.py
       - if: failure()
-        run: docker compose logs --tail 100
+        run: docker compose logs --tail 100 && docker compose -f docker-compose.public.yml logs --tail 100
 
   terraform:
     runs-on: ubuntu-24.04

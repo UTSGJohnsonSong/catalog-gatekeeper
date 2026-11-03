@@ -10,6 +10,10 @@ from pydantic import BaseModel, Field
 
 class Meta(BaseModel):
     demo_mode: bool
+    public_demo: bool
+    # The token the sign-in page fills in. Only demo tokens, which are public by design, ever appear here.
+    demo_token: str | None
+    demo_reset_minutes: int
     model_mode: str
     model: str
     provider: str
@@ -162,4 +166,7 @@ class AuditEntry(BaseModel):
 
 class SimulateEditRequest(BaseModel):
     product_id: int
-    description_html: str = "<p>Edited by the merchant in the Shopify admin while the fix was waiting for review.</p>"
+    description_html: str = Field(
+        default="<p>Edited by the merchant in the Shopify admin while the fix was waiting for review.</p>",
+        max_length=20_000,
+    )

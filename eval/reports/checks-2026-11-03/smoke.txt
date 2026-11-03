@@ -1,0 +1,19 @@
+$ python scripts/smoke.py   (2026-11-03T09:07:18Z, against docker-compose.yml on 127.0.0.1:8000)
+ok   API is up in demo mode, model heuristic-v1
+ok   the queue refuses a request with no token
+ok   17 fixes in the queue, all labelled as demo model
+ok   a proposal shows its diff and all 12 checks
+ok   approval with the wrong review hash is refused
+ok   approval with the right review hash is accepted
+ok   the fix was written and verified by read-back
+ok   the product's content hash changed in the store
+ok   a blocked fix offers no review hash
+ok   a blocked fix cannot be approved
+ok   a simulated merchant edit sends a signed webhook through the real route
+ok   the open fix went stale after the merchant edit
+ok   the audit log recorded each step
+ok   MCP exposes 7 tools, all read-only
+ok   MCP reads proposals over streamable HTTP and labels the demo model
+ok   MCP policy search finds the returns policy
+SMOKE PASSED (store simulated, model is a template script, not an LLM)
+exit=0

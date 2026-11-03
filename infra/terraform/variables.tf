@@ -23,6 +23,11 @@ variable "shop_domain" {
   description = "The one store this deployment serves, for example my-store.myshopify.com."
 }
 
+variable "shopify_client_id" {
+  type        = string
+  description = "Client ID of the Dev Dashboard app. Not a secret. The client secret goes in Secrets Manager."
+}
+
 variable "allowed_cidrs" {
   type        = list(string)
   description = "Who may reach the load balancer. Shopify webhook delivery needs 0.0.0.0/0 unless you restrict /webhooks elsewhere."

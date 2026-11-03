@@ -1,0 +1,43 @@
+# The free public demo: one web service on Render's free plan, with a free Neon Postgres as DATABASE_URL.
+# Steps, limits and what this exposes are in docs/DEPLOY_DEMO.md. Nothing here costs money or holds a real key.
+services:
+  - type: web
+    name: catalog-gatekeeper-demo
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    # Setup, then the API and the worker as child processes, then a reset every DEMO_RESET_MINUTES.
+    dockerCommand: python -m gatekeeper.allinone
+    # /readyz reads the database and needs the worker's heartbeat, so it is not a liveness check.
+    healthCheckPath: /healthz
+    autoDeployTrigger: "off"
+    envVars:
+      # Neon's direct connection string, not the -pooler one: migrations and the writer use session advisory locks.
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_DB_PASSWORD
+        generateValue: true
+      - key: SHOPIFY_WEBHOOK_SECRET
+        generateValue: true
+      - key: PUBLIC_DEMO
+        value: "1"
+      - key: DEMO_MODE
+        value: "1"
+      - key: DEMO_AUTORUN
+        value: "16"
+      - key: DEMO_RESET_MINUTES
+        value: "60"
+      - key: WRITEBACK_ENABLED
+        value: "1"
+      - key: SHOPIFY_ADAPTER
+        value: fixture
+      - key: LLM_PROVIDER
+        value: heuristic
+      # Under-counting proxies is safe: visitors then share buckets. Over-counting lets them forge their address.
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"
+      - key: FIXTURES_DIR
+        value: /app/fixtures
+      - key: STATIC_DIR
+        value: /app/static

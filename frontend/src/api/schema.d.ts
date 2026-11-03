@@ -376,6 +376,10 @@ export interface components {
         Meta: {
             /** Demo Mode */
             demo_mode: boolean;
+            /** Demo Reset Minutes */
+            demo_reset_minutes: number;
+            /** Demo Token */
+            demo_token: string | null;
             /** Judge */
             judge: string;
             /** Model */
@@ -384,6 +388,8 @@ export interface components {
             model_mode: string;
             /** Provider */
             provider: string;
+            /** Public Demo */
+            public_demo: boolean;
             /** Shopify Adapter */
             shopify_adapter: string;
             /** Writeback Env Enabled */

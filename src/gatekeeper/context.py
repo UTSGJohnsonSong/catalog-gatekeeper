@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import cast
 
+import httpx
 from psycopg_pool import ConnectionPool
 
 from gatekeeper.config import Settings
@@ -15,7 +16,7 @@ from gatekeeper.llm.port import LLMProvider
 from gatekeeper.rag.embedder import Embedder
 from gatekeeper.rag.store import load_embedder
 from gatekeeper.shopify.fixture import FixtureShopify
-from gatekeeper.shopify.live import LiveShopify
+from gatekeeper.shopify.live import ClientCredentialsToken, LiveShopify, StaticToken, TokenSource
 from gatekeeper.shopify.port import ShopifyPort
 
 
@@ -45,18 +46,34 @@ def build_provider(settings: Settings) -> tuple[LLMProvider, LLMProvider | None]
     return agent, judge
 
 
-def build_shopify(settings: Settings, pool: ConnectionPool[Conn]) -> ShopifyPort:
+def build_shopify(
+    settings: Settings, pool: ConnectionPool[Conn], *, transport: httpx.BaseTransport | None = None
+) -> ShopifyPort:
+    """`transport` replaces the network, for tests of this wiring."""
     if settings.shopify_adapter == "fixture":
         return cast(ShopifyPort, FixtureShopify(pool))
-    if not settings.shopify_access_token:
-        raise ValueError("SHOPIFY_ADAPTER=live needs SHOPIFY_ACCESS_TOKEN")
+    tokens: TokenSource
+    if settings.shopify_client_id and settings.shopify_client_secret:
+        tokens = ClientCredentialsToken(
+            shop_domain=settings.shopify_shop_domain,
+            client_id=settings.shopify_client_id,
+            client_secret=settings.shopify_client_secret.get_secret_value(),
+            transport=transport,
+        )
+    elif settings.shopify_access_token:
+        tokens = StaticToken(settings.shopify_access_token.get_secret_value())
+    else:
+        raise ValueError(
+            "SHOPIFY_ADAPTER=live needs SHOPIFY_ACCESS_TOKEN, or SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET"
+        )
     return cast(
         ShopifyPort,
         LiveShopify(
             shop_domain=settings.shopify_shop_domain,
-            access_token=settings.shopify_access_token.get_secret_value(),
+            token_source=tokens,
             api_version=settings.shopify_api_version,
             writes_enabled=settings.writeback_enabled,
+            transport=transport,
         ),
     )
 

@@ -55,6 +55,8 @@ export function QueuePage() {
   const client = useQueryClient();
   const [filter, setFilter] = useState("open");
   const { data, isLoading, error } = useQuery({ queryKey: ["queue"], queryFn: api.queue, refetchInterval: 3000 });
+  // Starting runs is an admin action. A reviewer, such as every visitor of the public demo, would only get a 403.
+  const { data: me } = useQuery({ queryKey: ["whoami"], queryFn: api.whoami, retry: false });
   const run = useMutation({
     mutationFn: () => api.runAgent(10),
     onSuccess: () => client.invalidateQueries({ queryKey: ["queue"] }),
@@ -71,9 +73,11 @@ export function QueuePage() {
     <>
       <div className="page-head">
         <h1>Review queue</h1>
-        <button onClick={() => run.mutate()} disabled={run.isPending}>
-          Audit more products
-        </button>
+        {me?.role === "admin" && (
+          <button onClick={() => run.mutate()} disabled={run.isPending}>
+            Audit more products
+          </button>
+        )}
       </div>
       <OpsNotice />
       {run.isError && (

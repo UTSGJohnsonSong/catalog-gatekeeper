@@ -20,6 +20,10 @@ python scripts/smoke.py
 
 That drives the same flow over HTTP against the running stack.
 
+To put the same demo on the internet for free, see `docs/DEPLOY_DEMO.md`: one container on Render's free plan and a
+free Neon database, in a public mode with rate limits, a reviewer-only token and periodic resets. It is rehearsed
+locally and not deployed yet.
+
 ## What is real and what is not
 
 | Part | State |
@@ -32,7 +36,8 @@ That drives the same flow over HTTP against the running stack.
 | CI workflow | **Ran on GitHub once.** Six of seven jobs passed. `security` failed because gitleaks could not resolve the parent of the root commit on the first push, so it scanned nothing |
 | Hosted LLM provider and judge | **Ran for real, once**, on the dev split: 120 agent calls and 40 judge calls to `claude-opus-5-5` |
 | Agent behaviour, cost, latency | **Measured once on 40 synthetic products** (see Results). Repair quality has no automatic score. The policy search and citation path was never used by the real model |
-| Live Shopify adapter | **Written, not run.** Tested against a mocked GraphQL server only. It has never called a store |
+| Free public demo (one container, Render and Neon) | **Rehearsed locally, not deployed.** `docker-compose.public.yml` with `scripts/smoke_public.py` passed on 2026-11-03; output in `eval/reports/checks-2026-11-03/` |
+| Live Shopify adapter | **Written, not run.** Tested against a mocked GraphQL server only, token renewal included. It has never called a store |
 | Terraform for ECS and RDS | **Validated with `terraform validate`, never applied** |
 
 `docs/DEMO_HONESTY.md` has the detail, `docs/REVIEW_2026-10-31.md` lists what review found and what stayed unfixed.
@@ -91,10 +96,10 @@ On Windows use `.venv\Scripts\activate`. Tests use real Postgres, not mocks. Cov
 ## Limits
 
 - Single store, single deployment. This is not a public Shopify app: no OAuth install, no compliance webhooks, no session tokens.
-- Reviewer tokens have no rate limit or expiry. Put a WAF or a CIDR rule in front before real use.
+- Reviewer tokens never expire. Rate limits exist only in the public demo mode, in one process's memory. Put a WAF or a CIDR rule in front before real use.
 - Rules are English word lists, so they miss paraphrases and can false-block plain English.
 - Only the first 25 variants and 10 media of a product are read from a live store.
-- The live adapter takes one Admin API token and does not refresh it. Shopify's client-credentials tokens last 24 hours.
+- With `SHOPIFY_CLIENT_ID` and `SHOPIFY_CLIENT_SECRET`, the live adapter renews its 24-hour token itself. That is tested against mocked HTTP only.
 - The eval data is synthetic. Its author also wrote the rules.
 
 ## Steps only the owner can do
@@ -116,23 +121,25 @@ Use the virtual environment from "Tests" above. The sweep stops after 3 runs in 
 
 The report in `eval/reports/` gives run outcomes, validator results, judge concerns, policy retrieval, citation checks, cost and latency. It does not score repair quality, so read `per_case`, above all the 10 injection cases. `injected_phrase_copied` only detects verbatim copying.
 
-**3. Try a real development store (free, reads first).** Shopify no longer lets you create a custom app with a permanent token in the store admin. Create the store and the app in the same organization at https://dev.shopify.com/dashboard/: Stores, Create store, Dev. Then Apps, Create app, Start from Dev Dashboard, with scopes `read_products` and `write_products`. Release a version, install it on the store, and copy the client ID and secret from Credentials. The token below lasts 24 hours, and this app does not refresh it, so fetch a new one and restart when it expires.
+**3. Try a real development store (free, reads first).** Shopify no longer lets you create a custom app with a permanent token in the store admin. Create the store and the app in the same organization at https://dev.shopify.com/dashboard/: Stores, Create store, Dev. Then Apps, Create app, Start from Dev Dashboard, with scopes `read_products` and `write_products`. Release a version, install it on the store, and copy the client ID and secret from Credentials. With those two set, the app asks Shopify for a 24-hour token and renews it before it expires. Use a database of its own, so the real store's data never mixes with the demo's.
 ```bash
 docker compose up -d db
-export CLIENT_ID=... CLIENT_SECRET=...
-export SHOPIFY_ACCESS_TOKEN=$(curl -s -X POST https://your-store.myshopify.com/admin/oauth/access_token -d grant_type=client_credentials -d client_id=$CLIENT_ID -d client_secret=$CLIENT_SECRET | python -c "import json,sys;print(json.load(sys.stdin)['access_token'])")
-export DATABASE_URL=postgresql://gatekeeper:local-demo-owner@127.0.0.1:54329/gatekeeper
+docker compose exec db createdb -U gatekeeper gatekeeper_live
+export SHOPIFY_CLIENT_ID=... SHOPIFY_CLIENT_SECRET=...
+export DATABASE_URL=postgresql://gatekeeper:local-demo-owner@127.0.0.1:54329/gatekeeper_live
 export SHOPIFY_ADAPTER=live SHOPIFY_SHOP_DOMAIN=your-store.myshopify.com
-export SHOPIFY_WEBHOOK_SECRET=$CLIENT_SECRET WRITEBACK_ENABLED=0 DEMO_MODE=0
+export SHOPIFY_WEBHOOK_SECRET=$SHOPIFY_CLIENT_SECRET WRITEBACK_ENABLED=0 DEMO_MODE=0
 export REVIEWER_TOKENS="you:admin:$(python -c 'import hashlib,sys;print(hashlib.sha256(sys.argv[1].encode()).hexdigest())' YOUR_LONG_RANDOM_TOKEN)"
 python -m gatekeeper.seed && uvicorn gatekeeper.api.app:create_app --factory --port 8000
 ```
-This serves the API only. Agent runs also need `python -m gatekeeper.worker` in a second shell with the same variables, and `/readyz` returns 503 until the worker is running. Keep writes off at first. Save real responses as new fixtures, compare them with the mock in `tests/integration/test_shopify_adapters.py`, then turn on `WRITEBACK_ENABLED=1` and `POST /api/admin/writeback`. Webhooks need a public HTTPS address, so register `products/update`, `products/create` and `products/delete` at `/webhooks/shopify` only once you have one.
+This serves the API only. Agent runs also need `python -m gatekeeper.worker` in a second shell with the same variables, and `/readyz` returns 503 until the worker is running. Keep writes off at first. Save real responses as new fixtures, compare them with the mock in `tests/integration/test_shopify_adapters.py`, then turn on `WRITEBACK_ENABLED=1` and `POST /api/admin/writeback`. Writes need a model key: the app refuses to let the template model write to a store. Shopify does not say whether a new client-credentials token revokes older ones, and the API and the worker each hold their own; watch for repeated 401s on the first run. Webhooks need a public HTTPS address, so register `products/update`, `products/create` and `products/delete` at `/webhooks/shopify` only once you have one.
 
-**4. Deploy to AWS (spends money every month, about one small RDS instance, one load balancer and two Fargate tasks).** The HTTPS listener needs an ACM certificate, and that needs a domain you control. A live store also needs token refresh first, because the 24-hour token in step 3 would stop working a day after deploy. Create an S3 state bucket and the certificate, then:
+**4. Put the demo online (free, two free accounts).** Create a Neon project and a Render Blueprint from `render.yaml`. Nothing is billed: the service sleeps when idle, and running out of free hours suspends it until next month. Steps, limits and what a visitor can do are in `docs/DEPLOY_DEMO.md`. Rehearse first with `docker compose -f docker-compose.public.yml up -d --build --wait` and `python scripts/smoke_public.py`.
+
+**5. Deploy to AWS (spends money every month, about one small RDS instance, one load balancer and two Fargate tasks).** The HTTPS listener needs an ACM certificate, and that needs a domain you control. The tasks take the app's client ID as a variable and its client secret from Secrets Manager, so the token renews itself. Create an S3 state bucket and the certificate, then:
 ```bash
 cd infra/terraform
 terraform init -backend-config="bucket=YOUR_BUCKET" -backend-config="key=gatekeeper.tfstate" -backend-config="region=ca-central-1"
-terraform plan -var image_tag=v1 -var acm_certificate_arn=YOUR_ARN -var shop_domain=your-store.myshopify.com
+terraform plan -var image_tag=v1 -var acm_certificate_arn=YOUR_ARN -var shop_domain=your-store.myshopify.com -var shopify_client_id=YOUR_CLIENT_ID
 ```
 Read the plan, then apply it. Push the image to the ECR repository it creates, set each secret with `aws secretsmanager put-secret-value`, and run the `migrate` task once before starting the services. `WRITEBACK_ENABLED` stays off until you change the variable.

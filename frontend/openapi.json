@@ -228,6 +228,21 @@
       "title": "Demo Mode",
       "type": "boolean"
      },
+     "demo_reset_minutes": {
+      "title": "Demo Reset Minutes",
+      "type": "integer"
+     },
+     "demo_token": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Demo Token"
+     },
      "judge": {
       "title": "Judge",
       "type": "string"
@@ -244,6 +259,10 @@
       "title": "Provider",
       "type": "string"
      },
+     "public_demo": {
+      "title": "Public Demo",
+      "type": "boolean"
+     },
      "shopify_adapter": {
       "title": "Shopify Adapter",
       "type": "string"
@@ -259,6 +278,9 @@
     },
     "required": [
      "demo_mode",
+     "public_demo",
+     "demo_token",
+     "demo_reset_minutes",
      "model_mode",
      "model",
      "provider",
@@ -710,6 +732,7 @@
     "properties": {
      "description_html": {
       "default": "<p>Edited by the merchant in the Shopify admin while the fix was waiting for review.</p>",
+      "maxLength": 20000,
       "title": "Description Html",
       "type": "string"
      },

@@ -7,6 +7,7 @@
 | Judge | Not run in demo mode, because a template cannot assess anything | No judge rows, `judge_status: disabled` |
 | Embeddings | Hashed TF-IDF. Lexical matching, no semantic understanding | `embedder` in every retrieval report |
 | Sign-in | Demo tokens exist only with `DEMO_MODE=1` and no configured tokens. Production refuses to boot with demo mode on | Banner: "Demo sign-in is on." |
+| Public demo | `PUBLIC_DEMO=1`: only the reviewer demo token, and a shared sandbox that resets on boot and every `DEMO_RESET_MINUTES`. The reset empties the activity log, which the app role itself can never change | Banner: "This is a shared sandbox". The activity page says when the log is cleared |
 
 Rules that keep this honest:
 

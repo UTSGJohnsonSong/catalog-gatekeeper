@@ -42,6 +42,12 @@ Logs are JSON on stdout, with `job_id`, `kind`, `proposal_id`, `run_id` where th
 | Shopify throttling | Bucket exhausted during a large sync | Jobs defer themselves. Reduce sweep size if persistent |
 | Webhooks stop arriving | Shopify deletes a subscription after 8 failed deliveries over 4 hours | Re-register the subscription, then run a sync. The hourly sync covers 2 hours back, and the daily full sync covers anything older |
 | False-block complaint | A lexical rule hit plain English | Read the evidence on the proposal. Add a hard negative to `eval/datasets` first, then change the rule, then run the gate |
+| `401` from the token endpoint, jobs dead with "token request rejected" | The client secret was rotated or the app was uninstalled | Update `shopify-client-secret` and redeploy. The adapter asks for a new token on the next call |
+| Public demo: visitors get `429` | One address used its allowance, or the whole demo is busy, which is logged as "the demo-wide rate limit was reached" | Expected under load. If honest visitors share one bucket, the proxy hop count is wrong in either direction: a count that is too low or too high both make visitors share. Read the "client address check" lines as `docs/DEPLOY_DEMO.md` explains |
+| Public demo: "demo reset failed, N in a row" | A table stayed busy, the database connection dropped, or the demo could not be loaded again after it was emptied. The demo may be empty until a reset succeeds | It retries within a minute. After five failures in a row the container exits and the platform restarts it; read the boot log for the cause |
+| Public demo: "demo reset cannot succeed" or a boot that refuses the database | The database holds another shop, a real model's runs, or products from outside the demo store | `DATABASE_URL` points at the wrong database. Stop the service and fix it. Nothing was changed: the check runs before setup |
+| Public demo: "demo reset skipped" as an error | Another session has held the reset lock for several minutes | Find it in `pg_stat_activity` by `application_name = 'gatekeeper-reset'` and end it |
+| Public demo boot loops with "PUBLIC_DEMO must not hold" | A model key or store credentials were added to the demo's environment | Remove them. A public demo never holds either |
 
 ## Procedures
 
