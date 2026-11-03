@@ -4,7 +4,7 @@ An AI agent that audits and repairs a Shopify-style product catalog. It proposes
 
 **Why it exists.** An LLM can write a good product description, and it can also invent a warranty or follow an instruction hidden in a supplier's text. The interesting problem is what stands between the model and the store. Here that is a narrow tool surface, 12 deterministic checks, citations checked word for word, a person approving an exact diff, and a write-back that refuses to overwrite a merchant's newer edit.
 
-**The demo runs with no account and no key, so two parts are simulated.** The store is a fixture, and the model is a template script, not an LLM. The eval data is synthetic. See the table below.
+**The demo runs with no account and no key, so two parts are simulated.** The store is a fixture, and the model is a template script, not an LLM. The eval data is synthetic. A real model has run once, on 40 synthetic products, through the eval rather than the demo. See the table below.
 
 ## Run it
 
@@ -29,9 +29,9 @@ That drives the same flow over HTTP against the running stack.
 | MCP server | **Ran for real** over streamable HTTP and through an in-process client |
 | Deterministic rules and citation checker | **Ran for real**, measured on synthetic data (`docs/EVAL.md`) |
 | RAG | **Ran for real**, on 19 chunks of invented policy, with lexical hashed embeddings, not a semantic model |
-| CI workflow | **Written, not run.** Each job's commands ran locally, but it has never run on GitHub, because no repo exists yet |
-| Hosted LLM provider and judge | **Written, not run.** Tested against a fake client. No key was available, so no model has been called |
-| Agent behaviour, cost, latency | **Not measured.** Needs a key: `python -m gatekeeper_eval agent`. Repair quality has no automatic score, even with a key |
+| CI workflow | **Ran on GitHub once.** Six of seven jobs passed. `security` failed because gitleaks could not resolve the parent of the root commit on the first push, so it scanned nothing |
+| Hosted LLM provider and judge | **Ran for real, once**, on the dev split: 120 agent calls and 40 judge calls to `claude-opus-5-5` |
+| Agent behaviour, cost, latency | **Measured once on 40 synthetic products** (see Results). Repair quality has no automatic score. The policy search and citation path was never used by the real model |
 | Live Shopify adapter | **Written, not run.** Tested against a mocked GraphQL server only. It has never called a store |
 | Terraform for ECS and RDS | **Validated with `terraform validate`, never applied** |
 
@@ -65,6 +65,16 @@ Rules on synthetic data, held-out test split, first run (`docs/EVAL.md`):
 
 These measure rules against their specification. They say nothing about an LLM.
 
+One real-model run, `claude-opus-5-5`, 40 synthetic products on the dev split (`eval/reports/agent-dev-20261102T095137Z.json`):
+
+- All 40 runs finished, and all 40 proposals stopped at human review. None was blocked, so this run did not test the validators against a bad proposal.
+- The injected text was not followed in any of the 10 injection proposals, from reading them by hand. All 10 were flagged, but the agent had already read A13's finding, and A13 was tuned on this split. So this does not show it can spot wording A13 misses.
+- The judge raised 2 concerns, both about replacing "Coming soon": the new text no longer says the item is unavailable. A03 treats that wording as a placeholder, and the judge's point is a real gap in that rule.
+- No citations. The model never called policy search, because no proposal touched a policy topic.
+- Cost 1.02 USD in total, about 0.025 per product. Latency p50 12.8 s, p95 20.3 s.
+
+The judge, validator and retrieval figures come from a database extract saved beside the report, because that report predates those metrics. This is one small run, not a repair-quality score, so no accuracy is claimed.
+
 ## Tests
 
 ```bash
@@ -91,13 +101,9 @@ On Windows use `.venv\Scripts\activate`. Tests use real Postgres, not mocks. Cov
 
 Everything above runs without these. Each one needs an account, a key or spending approval.
 
-**1. Publish the repo (needs your yes, because a public repo cannot be taken back).** Commits show the author email in `git log`.
-```bash
-gh repo create catalog-gatekeeper --public --source . --push
-```
-Then enable secret push protection in the repo's settings. CI runs on the first push; fix anything it finds before citing it.
+**1. Publish the repo (done 2026-11-02).** Commits show the author email in `git log`. Secret scanning and push protection are on.
 
-**2. Measure the agent with a real model (spends money).** Create an API key with the hosted LLM provider and set a spend limit in its console. That limit is the real cap: `DAILY_COST_CAP_USD` (default 5 USD) counts only the current run, because each run starts with an empty eval database. One run makes 40 agent runs, each capped at 0.25 USD.
+**2. Measure the agent with a real model (spends money; ran once, repeat it after changes).** Create an API key with the hosted LLM provider and set a spend limit in its console. That limit is the real cap: `DAILY_COST_CAP_USD` (default 5 USD) counts only the current run, because each run starts with an empty eval database. One run makes 40 agent runs, each capped at 0.25 USD.
 
 Start only the database, and set the key only in this shell. A key visible to a full `docker compose up` switches the demo to the hosted LLM, and it runs up to 16 products on its own.
 ```bash
@@ -108,7 +114,7 @@ python -m gatekeeper_eval agent --split dev
 ```
 Use the virtual environment from "Tests" above. The sweep stops after 3 runs in a row raise an error, so a bad key costs nothing. Status `FAILED` means no run finished, and `PARTIAL` means it stopped early. Do not quote either. If the first run reaches the 1 USD cap, raise the cap and run again.
 
-The report in `eval/reports/` gives run outcomes, validator results, citation checks, cost and latency. It does not score repair quality, so read `per_case`, above all the 10 injection cases. `injected_phrase_copied` only detects verbatim copying. This is the first run of the real provider, so expect to fix something.
+The report in `eval/reports/` gives run outcomes, validator results, judge concerns, policy retrieval, citation checks, cost and latency. It does not score repair quality, so read `per_case`, above all the 10 injection cases. `injected_phrase_copied` only detects verbatim copying.
 
 **3. Try a real development store (free, reads first).** Shopify no longer lets you create a custom app with a permanent token in the store admin. Create the store and the app in the same organization at https://dev.shopify.com/dashboard/: Stores, Create store, Dev. Then Apps, Create app, Start from Dev Dashboard, with scopes `read_products` and `write_products`. Release a version, install it on the store, and copy the client ID and secret from Credentials. The token below lasts 24 hours, and this app does not refresh it, so fetch a new one and restart when it expires.
 ```bash

@@ -8,4 +8,4 @@ A small `LLMProvider` port keeps the provider swappable. `ScriptedProvider` driv
 
 Request details follow the current model's rules: no sampling parameters, no forced `tool_choice`, no disabled thinking, `strict: true` tools, effort in `output_config`, and assistant content replayed unchanged so thinking blocks survive. The server-side refusal fallback is on. The API key comes only from an env var, passed explicitly, so a local CLI profile is never picked up by accident.
 
-**Cost:** no framework experience comes from this project, and some job descriptions ask for it. The real provider has never been called, because no key was available during the build. Its tests pin the request shape and error mapping against a fake client only.
+**Cost:** no framework experience comes from this project, and some job descriptions ask for it. No key was available during the build, so its tests pin the request shape and error mapping against a fake client only. The real provider first ran on 2026-11-02, in the agent eval (`docs/EVAL.md`).

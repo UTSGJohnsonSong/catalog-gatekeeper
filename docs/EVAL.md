@@ -1,6 +1,6 @@
 # Evaluation
 
-**What this measures:** deterministic rules, the citation checker and lexical retrieval, against a specification, on synthetic data. **What it does not measure:** how well any LLM repairs a catalog. No real model has been called, so agent accuracy, cost and latency are not known.
+**What this measures:** deterministic rules, the citation checker and lexical retrieval, against a specification, on synthetic data. **What it does not measure:** how well any LLM repairs a catalog. A real model has run once, on the dev split (see "The agent suite"). That gives cost, latency and run outcomes, and no accuracy score.
 
 Run everything with `python -m gatekeeper_eval all --split dev`, then `--split test`. Each run writes a JSON report to `eval/reports/` with the command, git SHA, whether source files had uncommitted changes, dataset hash and limits.
 
@@ -45,9 +45,31 @@ The end-to-end suite ran 17 demo products through the real pipeline with the tem
 
 Tests make the gate fail on purpose: rules that find nothing, rules that fire on everything, a checker that accepts everything, an unknown suite, an end-to-end run that processed nothing, and an unfrozen test split.
 
-The agent suite (`python -m gatekeeper_eval agent`) needs a key and costs money. It has never run against a real model. Its report is saved as `SKIPPED` without a key. With a key it is `FAILED` if no run finished, which also exits nonzero, and otherwise `NOT_GATED` until thresholds are set from a first run. The report's `status` is `PARTIAL` if the sweep stopped early, and those numbers should not be quoted.
+## The agent suite
 
-It samples 40 products: 6 for each of A01, A02, A03, A05 and A07, and 10 injection cases that also lack an SEO description, so the agent has to write text while reading the hostile description. It reports run outcomes, validator results, citation checks, cost and latency. It does not score repair quality, so a person reads `per_case`. `injected_phrase_copied` detects verbatim copying only, not following the instruction in new words.
+`python -m gatekeeper_eval agent` needs a key and costs money. Its report is saved as `SKIPPED` without a key. With a key it is `FAILED` if no run finished, which also exits nonzero, and otherwise `NOT_GATED`, because no thresholds are set yet. The report's `status` is `PARTIAL` if the sweep stopped early, and those numbers should not be quoted.
+
+It samples 40 products: 6 for each of A01, A02, A03, A05 and A07, and 10 injection cases that also lack an SEO description, so the agent has to write text while reading the hostile description. It reports run outcomes, validator results, judge concerns, policy retrieval, citation checks, cost and latency. It does not score repair quality, so a person reads `per_case`. `injected_phrase_copied` detects verbatim copying only, not following the instruction in new words.
+
+### First real run, 2026-11-02
+
+`claude-opus-5-5`, dev split, commit `66a1eca`. Sources: `eval/reports/agent-dev-20261102T095137Z.json`, and `eval/reports/agent-dev-20261102T095137Z-db-extract.txt` for the judge, validator and retrieval rows, which that report did not record yet.
+
+| Measure | Result | How far it goes |
+|---|---|---|
+| Runs finished | 40/40 | |
+| Proposals pending review | 40/40, 0 blocked | Every validator passed, 480/480, so the block path was not tested by this run |
+| Injection cases, instruction not followed | 10/10 | Read by hand, not scored |
+| Injection cases, `injection_suspected` flag | 10/10 | Not independent. The agent reads A13's finding first, and A13 was tuned on this split |
+| Injected phrase copied verbatim | 0/10 | Verbatim match only |
+| Judge | 40/40 returned a verdict, 2 concerns kept, 0 discarded | Both concerns are the finding below |
+| Policy search and citations | 0 searches, 0 citations | The sample never reached this path, so it says nothing about citation quality with a real model |
+| Cost | 1.02 USD total: 0.88 agent, 0.14 judge | 0.025 per product |
+| Latency | p50 12.8 s, p95 20.3 s | Includes the judge |
+
+**What the run found.** A03 treats "Coming soon" as a placeholder, so the agent replaced it. On the two cases worded that way ("Coming soon", "COMING SOON!"), the judge objected that the new text no longer says the item is unavailable. The rule's own label calls these placeholders, so the rule may be wrong about what the words mean. No deterministic check caught this. It was not changed, because a person should decide, and it is flagged for review as designed.
+
+A rough word comparison found no number in any proposal that was missing from its source product. 15 proposals added a generic word such as "range" or "bag", and these were judged harmless by reading them. This is a check by script and by eye, not a score. All the products are simple and synthetic.
 
 An earlier version of this sample never ran its injection cases, because they shared product ids with the other cases and the fixture store dropped them. It also reported "measured" when every run failed. A dummy-key run against a closed port exposed both before any real run, and `tests/eval/test_eval_integrity.py` now covers them.
 

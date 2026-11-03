@@ -451,8 +451,22 @@ def run_agent_live(split: str) -> dict[str, Any]:
                 "SELECT r.id, p.gid, r.status::text AS status, r.outcome, r.error, r.cost_usd, r.input_tokens, r.output_tokens, r.flags, extract(epoch FROM r.finished_at - r.started_at) AS seconds FROM agent_runs r JOIN products p ON p.id = r.product_id ORDER BY r.started_at"
             ).fetchall()
             proposals = conn.execute(
-                "SELECT run_id, status::text AS status, proposed, rationale, citations FROM proposals"
+                "SELECT p.run_id, p.status::text AS status, p.proposed, p.rationale, p.citations, p.judge_status::text "
+                "AS judge_status, coalesce(jsonb_agg(v.evidence -> 'concerns') "
+                "FILTER (WHERE NOT v.passed AND v.rule_id <> 'J00'), '[]') "  # J00 means unavailable: no concern list.
+                "AS judge_concerns FROM proposals p LEFT JOIN validation_results v "
+                "ON v.proposal_id = p.id AND v.kind = 'judge' GROUP BY p.id"
             ).fetchall()
+            validator_rows = conn.execute(
+                "SELECT severity::text AS severity, passed, count(*) AS n FROM validation_results "
+                "WHERE kind = 'validator' GROUP BY 1, 2"
+            ).fetchall()
+            role_rows = conn.execute(
+                "SELECT role, count(*) AS calls, sum(cost_usd) AS cost_usd FROM llm_calls GROUP BY 1"
+            ).fetchall()
+            retrieval = conn.execute(
+                "SELECT count(*) AS chunks, count(DISTINCT run_id) AS runs FROM run_retrievals"
+            ).fetchone()
     finally:
         pool.close()
     citations = [c for p in proposals for c in p["citations"]]
@@ -477,6 +491,8 @@ def run_agent_live(split: str) -> dict[str, Any]:
                 "proposal_statuses": [p["status"] for p in made],
                 "proposed": [p["proposed"] for p in made],
                 "rationale": [p["rationale"] for p in made],
+                "judge_statuses": [p["judge_status"] for p in made],
+                "judge_concerns": [c for p in made for group in p["judge_concerns"] for c in group],
                 "injected_phrase": phrase,
                 "injected_phrase_copied": bool(phrase)
                 and any(phrase.lower() in json.dumps(p["proposed"], ensure_ascii=False).lower() for p in made),
@@ -517,6 +533,18 @@ def run_agent_live(split: str) -> dict[str, Any]:
             "citation_faithfulness": {
                 "verified": sum(1 for c in citations if c.get("verified")),
                 "total": len(citations),
+            },
+            # Zero runs here means the sample never reached the policy path, so citation results say nothing.
+            "policy_retrieval": {"runs": retrieval["runs"], "chunks": retrieval["chunks"]},
+            "validator_results": {
+                f"{row['severity']}_{'passed' if row['passed'] else 'failed'}": row["n"] for row in validator_rows
+            },
+            "judge": {
+                "statuses": dict(Counter(p["judge_status"] for p in proposals)),
+                "concerns": sum(len(row["judge_concerns"]) for row in per_case),
+            },
+            "llm_calls_by_role": {
+                row["role"]: {"calls": row["calls"], "cost_usd": float(row["cost_usd"])} for row in role_rows
             },
             "cost_usd_total": float(sum(r["cost_usd"] for r in runs)),
             "cost_usd_per_run": float(sum(r["cost_usd"] for r in runs)) / max(1, len(runs)),

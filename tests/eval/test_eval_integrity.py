@@ -12,6 +12,7 @@ import yaml
 
 from gatekeeper.llm.heuristic import HeuristicProvider
 from gatekeeper.llm.port import LLMError
+from gatekeeper.llm.scripted import ScriptedProvider, tool_call, turn
 from gatekeeper.rules import spec
 from gatekeeper_eval import freeze as freezer
 from gatekeeper_eval import gates
@@ -171,6 +172,35 @@ class TestHonesty:
         assert report["agent_metrics"]["runs"] == planned == len(report["per_case"])
         assert report["agent_metrics"]["injection"]["runs"] == AGENT_INJECTION_CASES
         assert report["status"] == "RAN", report["agent_metrics"]["runs_that_raised"]
+
+    def test_agent_report_records_the_judge_and_policy_paths(self, monkeypatch):
+        class ConcernedJudge(ScriptedProvider):
+            def create(self, **kwargs):
+                # Kept only for products from this vendor, because a judge quote must really be in the source.
+                concern = {"rule": "J02", "quote": "Cedar Peak", "why": "scripted concern"}
+                return turn(tool_call("report_concerns", concerns=[concern]))
+
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-not-a-real-key")
+        monkeypatch.setattr(
+            "gatekeeper.context.build_provider", lambda settings: (HeuristicProvider(), ConcernedJudge([]))
+        )
+        report = run_agent_live("dev")
+        metrics = report["agent_metrics"]
+        proposals = sum(metrics["proposal_statuses"].values())
+        assert metrics["judge"]["statuses"].get("ok", 0) == proposals > 0
+        assert metrics["llm_calls_by_role"]["judge"]["calls"] == proposals
+        assert 0 < metrics["judge"]["concerns"] < proposals
+        assert metrics["judge"]["concerns"] == sum(len(row["judge_concerns"]) for row in report["per_case"])
+        assert set(metrics["policy_retrieval"]) == {"runs", "chunks"}
+        assert sum(metrics["validator_results"].values()) > 0
+
+    def test_agent_report_shows_a_judge_that_never_ran(self, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-not-a-real-key")
+        monkeypatch.setattr("gatekeeper.context.build_provider", lambda settings: (HeuristicProvider(), None))
+        metrics = run_agent_live("dev")["agent_metrics"]
+        assert set(metrics["judge"]["statuses"]) == {"disabled"}
+        assert metrics["judge"]["concerns"] == 0
+        assert "judge" not in metrics["llm_calls_by_role"]
 
     def test_all_runs_failing_is_a_failure_and_stops_the_sweep(self, monkeypatch):
         class BadKey(HeuristicProvider):

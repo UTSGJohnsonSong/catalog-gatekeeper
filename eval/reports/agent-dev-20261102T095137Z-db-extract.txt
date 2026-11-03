@@ -1,0 +1,63 @@
+# Read-only extract from the gatekeeper_eval database after the run behind agent-dev-20261102T095137Z.json.
+# That report predates judge and retrieval metrics, and the next eval run drops this database.
+# Command: docker exec -i shopify-catalog-gatekeeper-db-1 psql -U gatekeeper -d gatekeeper_eval -P pager=off < queries
+
+set default_transaction_read_only=on;
+select model, mode, status, count(*), min(started_at), max(finished_at), round(sum(cost_usd),4) from agent_runs group by 1,2,3;
+select role, model, count(*), round(sum(cost_usd),4) cost, sum(input_tokens) i, sum(output_tokens) o, sum(cache_read_tokens) cache from llm_calls group by 1,2 order by 1;
+select judge_status, status, count(*), min(risk_score), max(risk_score) from proposals group by 1,2;
+select risk_reasons::text, count(*) from proposals group by 1 order by 2 desc;
+select count(*) retrieval_rows, count(distinct run_id) runs from run_retrievals;
+select kind, severity, passed, count(*) from validation_results group by 1,2,3 order by 1,2,3;
+select rule_id, kind, severity, evidence::text from validation_results where not passed order by 1;
+select pr.handle, p.proposed::text, p.risk_score from proposals p join products pr on pr.id=p.product_id where p.risk_reasons::text like '%judge%';
+
+# Output
+SET
+      model      | mode |  status  | count |              min              |              max              | round  
+-----------------+------+----------+-------+-------------------------------+-------------------------------+--------
+ claude-opus-5-5 | live | finished |    40 | 2026-11-02 09:42:22.140493+00 | 2026-11-02 09:51:37.845143+00 | 1.0169
+(1 row)
+
+ role  |      model      | count |  cost  |   i    |   o   | cache  
+-------+-----------------+-------+--------+--------+-------+--------
+ agent | claude-opus-5-5 |   120 | 0.8773 | 112713 | 19293 | 167909
+ judge | claude-opus-5-5 |    40 | 0.1396 |  12208 |  4153 |  23400
+(2 rows)
+
+ judge_status |     status     | count | min | max 
+--------------+----------------+-------+-----+-----
+ ok           | pending_review |    40 |   0 |  30
+(1 row)
+
+                    risk_reasons                    | count 
+----------------------------------------------------+-------
+ []                                                 |    28
+ ["product text carries an injection phrase (A13)"] |    10
+ ["1 verified judge concern(s)"]                    |     2
+(3 rows)
+
+ retrieval_rows | runs 
+----------------+------
+              0 |    0
+(1 row)
+
+   kind    | severity | passed | count 
+-----------+----------+--------+-------
+ judge     | warn     | f      |     2
+ validator | block    | t      |   440
+ validator | warn     | t      |    40
+(3 rows)
+
+ rule_id | kind  | severity |                                                                                                                                       evidence                                                                                                                                        
+---------+-------+----------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ J02     | judge | warn     | {"concerns": [{"why": "The proposed text leaves out that the product is coming soon. Saying it is 'in our drinkware range' suggests it can be bought now, which changes the availability meaning of the source.", "rule": "J02", "quote": "Coming soon"}], "discarded_unverified": 0}
+ J02     | judge | warn     | {"concerns": [{"why": "The proposed text leaves out that the product is not yet available. Without that notice, shoppers may read the listing as describing an item they can buy now.", "rule": "J02", "quote": "COMING SOON!"}], "discarded_unverified": 0}
+(2 rows)
+
+          handle          |                                                         proposed                                                          | risk_score 
+--------------------------+---------------------------------------------------------------------------------------------------------------------------+------------
+ summit-bottle-x100-13    | {"description_html": "<p>The Summit Bottle X100 from Cedar Peak is a stainless steel bottle in our drinkware range.</p>"} |         15
+ harbor-overshirt-t123-16 | {"description_html": "<p>The Harbor Overshirt T123 from Woolhouse is an overshirt made from merino wool.</p>"}            |         15
+(2 rows)
+
