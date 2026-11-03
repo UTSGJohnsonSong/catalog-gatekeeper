@@ -101,7 +101,7 @@ On Windows use `.venv\Scripts\activate`. Tests use real Postgres, not mocks. Cov
 
 Everything above runs without these. Each one needs an account, a key or spending approval.
 
-**1. Publish the repo (done 2026-11-02).** Commits show the author email in `git log`. Secret scanning and push protection are on.
+**1. Publish the repo (created 2026-11-02, currently private).** Commits show the author email in `git log`. Before making it public, start the `ci` workflow by hand, because only that run makes gitleaks scan the whole history.
 
 **2. Measure the agent with a real model (spends money; ran once, repeat it after changes).** Create an API key with the hosted LLM provider and set a spend limit in its console. That limit is the real cap: `DAILY_COST_CAP_USD` (default 5 USD) counts only the current run, because each run starts with an empty eval database. One run makes 40 agent runs, each capped at 0.25 USD.
 
