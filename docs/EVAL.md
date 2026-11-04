@@ -53,7 +53,7 @@ It samples 40 products: 6 for each of A01, A02, A03, A05 and A07, and 10 injecti
 
 ### First real run, 2026-11-02
 
-`claude-opus-5-5`, dev split, commit `66a1eca`. Sources: `eval/reports/agent-dev-20261102T095137Z.json`, and `eval/reports/agent-dev-20261102T095137Z-db-extract.txt` for the judge, validator and retrieval rows, which that report did not record yet.
+A hosted LLM, dev split, commit `66a1eca`. Sources: `eval/reports/agent-dev-20261102T095137Z.json`, and `eval/reports/agent-dev-20261102T095137Z-db-extract.txt` for the judge, validator and retrieval rows, which that report did not record yet.
 
 | Measure | Result | How far it goes |
 |---|---|---|

@@ -34,7 +34,7 @@ locally and not deployed yet.
 | Deterministic rules and citation checker | **Ran for real**, measured on synthetic data (`docs/EVAL.md`) |
 | RAG | **Ran for real**, on 19 chunks of invented policy, with lexical hashed embeddings, not a semantic model |
 | CI workflow | **Ran on GitHub once.** Six of seven jobs passed. `security` failed because gitleaks could not resolve the parent of the root commit on the first push, so it scanned nothing |
-| Hosted LLM provider and judge | **Ran for real, once**, on the dev split: 120 agent calls and 40 judge calls to `claude-opus-5-5` |
+| Hosted LLM provider and judge | **Ran for real, once**, on the dev split: 120 agent calls and 40 judge calls to a hosted LLM |
 | Agent behaviour, cost, latency | **Measured once on 40 synthetic products** (see Results). Repair quality has no automatic score. The policy search and citation path was never used by the real model |
 | Free public demo (one container, Render and Neon) | **Rehearsed locally, not deployed.** `docker-compose.public.yml` with `scripts/smoke_public.py` passed on 2026-11-03; output in `eval/reports/checks-2026-11-03/` |
 | Live Shopify adapter | **Written, not run.** Tested against a mocked GraphQL server only, token renewal included. It has never called a store |
@@ -70,7 +70,7 @@ Rules on synthetic data, held-out test split, first run (`docs/EVAL.md`):
 
 These measure rules against their specification. They say nothing about an LLM.
 
-One real-model run, `claude-opus-5-5`, 40 synthetic products on the dev split (`eval/reports/agent-dev-20261102T095137Z.json`):
+One real-model run on a hosted LLM, 40 synthetic products on the dev split (`eval/reports/agent-dev-20261102T095137Z.json`):
 
 - All 40 runs finished, and all 40 proposals stopped at human review. None was blocked, so this run did not test the validators against a bad proposal.
 - The injected text was not followed in any of the 10 injection proposals, from reading them by hand. All 10 were flagged, but the agent had already read A13's finding, and A13 was tuned on this split. So this does not show it can spot wording A13 misses.
