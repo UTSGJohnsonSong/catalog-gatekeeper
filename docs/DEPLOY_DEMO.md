@@ -1,7 +1,7 @@
 # Free public demo
 
-State on 2026-11-03: **prepared and rehearsed locally, not deployed.** Deploying needs two free accounts that only
-the owner can create.
+State on 2026-11-04: **prepared and rehearsed locally, not deployed.** Deploying needs two free accounts that only
+the owner can create. The rehearsal was repeated on 2026-11-04 with the Polaris review UI and the landing page.
 
 The layout is one container on Render's free plan and one free Neon Postgres. Prices and limits below were read on
 2026-11-03 from [Render](https://render.com/docs/free) and [Neon](https://neon.com/pricing). Check both pages again
@@ -9,8 +9,9 @@ before relying on them.
 
 ## What a visitor gets
 
-- The same review UI and pipeline as `docker compose up`: a simulated store, the template model, the 12 checks,
-  approval of an exact diff, write-back with read-back, and "Edit as merchant" sending a signed webhook.
+- A landing page at `/`, and under `/app` the same review UI and pipeline as `docker compose up`: a simulated
+  store, the template model, the 12 checks, approval of an exact diff, write-back with read-back, and "Edit as
+  merchant" sending a signed webhook. Put the bare service URL on a CV; the page links to the demo itself.
 - Sign-in with the reviewer demo token, which the page fills in. The admin demo token is refused, so visitors cannot
   switch write-back off, start syncs or queue agent runs.
 - A shared sandbox. Every visitor sees the same queue. It returns to its first state on every boot and every
@@ -56,6 +57,9 @@ heartbeat.
 - **Proxy hop count.** Render does not document how many proxies append to `X-Forwarded-For`. `1` is the safe guess:
   if it is really 2, visitors share buckets, which errs towards limiting. See "Check the client address" below.
 - **Visitor text** (reject notes, simulated edits) is visible to other visitors until the next reset. The UI escapes it.
+- **Shopify's CDN.** The review UI loads Polaris from `cdn.shopify.com` in the visitor's browser, so `/app` needs that
+  CDN. Its Content-Security-Policy allows only the `/shopifycloud/` and `/static/fonts/` paths there, plus the inline
+  `<style>` blocks Polaris writes. The landing page and the API allow no other origin. If the CDN is blocked, `/app` says the review screen could not load.
 
 ## Rehearse locally
 
@@ -64,8 +68,9 @@ docker compose -f docker-compose.public.yml up -d --build --wait
 python scripts/smoke_public.py
 ```
 
-This runs the same container command against its own database on port 8001. The smoke test checks the token rules,
-the review flow with the worker in the same container, the body cap, the rate limit and the security headers.
+This runs the same container command against its own database on port 8001. The smoke test checks both pages and
+their security headers, the token rules, the review flow with the worker in the same container, the body cap and the
+rate limit.
 
 ## Deploy
 

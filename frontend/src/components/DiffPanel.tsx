@@ -8,22 +8,23 @@ const FIELD_NAMES: Record<string, string> = {
 };
 
 // HTML is rendered as escaped text on purpose. Catalog content is never injected into the page as markup.
+// Polaris has no diff component, so this one is ours.
 export function DiffPanel({ diffs }: { diffs: FieldDiff[] }) {
   return (
-    <div className="diffs">
+    <s-stack gap="base">
       {diffs.map((field) => (
-        <section key={field.field} className="diff">
-          <h3>{FIELD_NAMES[field.field] ?? field.field}</h3>
-          <p className="catalog-voice diff-body" data-testid={`diff-${field.field}`}>
+        <div key={field.field} className="diff">
+          <s-heading>{FIELD_NAMES[field.field] ?? field.field}</s-heading>
+          <p className="diff-body" data-testid={`diff-${field.field}`}>
             {diffWords(field.before, field.after).map((part, index) => {
               if (part.added) return <ins key={index}>{part.value}</ins>;
               if (part.removed) return <del key={index}>{part.value}</del>;
               return <span key={index}>{part.value}</span>;
             })}
           </p>
-          {field.before === "" && <p className="hint">This field was empty, so all of the text is new.</p>}
-        </section>
+          {field.before === "" && <s-paragraph color="subdued">This field was empty, so all of the text is new.</s-paragraph>}
+        </div>
       ))}
-    </div>
+    </s-stack>
   );
 }

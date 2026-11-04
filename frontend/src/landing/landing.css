@@ -1,0 +1,192 @@
+/* Landing page. The palette and the two type voices are the project's own, from docs/DESIGN.md: Newsreader speaks
+   for the catalog, Familjen Grotesk for the system. The one moving part is the gate run in the docket. */
+:root {
+  --paper: #edf1f3;
+  --surface: #f8fafb;
+  --ink: #17243b;
+  --ink-soft: #4b5a72;
+  --line: #c9d2db;
+  --harbour: #24508f;
+  --cleared: #1b7354;
+  --cleared-wash: #d6eee4;
+  --stopped: #ae2640;
+  --stopped-wash: #f8dfe4;
+  --hold: #94600a;
+  --on-primary: #ffffff;
+  --system: "Familjen Grotesk Variable", "Segoe UI", system-ui, sans-serif;
+  --catalog: "Newsreader Variable", Georgia, serif;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #151c29;
+    --surface: #1d2636;
+    --ink: #e4eaf2;
+    --ink-soft: #a6b3c6;
+    --line: #36445a;
+    --harbour: #8db2ea;
+    --cleared: #58c39a;
+    --cleared-wash: #17392f;
+    --stopped: #f08595;
+    --stopped-wash: #47202b;
+    --hold: #e0b060;
+    --on-primary: #10192a;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 17px/1.6 var(--system);
+  font-variant-numeric: tabular-nums;
+}
+
+a { color: var(--harbour); }
+:focus-visible { outline: 2px solid var(--harbour); outline-offset: 3px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.masthead,
+main,
+.colophon {
+  max-width: 76rem;
+  margin: 0 auto;
+  padding-inline: 1.5rem;
+}
+
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem 1.5rem;
+  padding-block: 1.25rem;
+}
+.wordmark { font-weight: 700; color: var(--ink); text-decoration: none; }
+.masthead-link { font-weight: 600; }
+
+h1, h2 { font-family: var(--catalog); font-weight: 500; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.4rem, 5.2vw, 3.7rem); line-height: 1.06; margin: 0 0 1.25rem; }
+h2 { font-size: clamp(1.7rem, 3vw, 2.2rem); line-height: 1.15; margin: 0 0 1.25rem; }
+h3 { font-size: 1rem; font-weight: 650; margin: 0 0 0.15rem; }
+p { margin: 0 0 1rem; max-width: 68ch; }
+
+.button {
+  display: inline-block;
+  padding: 0.6rem 1.1rem;
+  border: 1px solid var(--ink-soft);
+  border-radius: 3px;
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+.button:hover { background: var(--surface); }
+.button-primary { background: var(--harbour); border-color: var(--harbour); color: var(--on-primary); }
+.button-primary:hover { background: var(--harbour); filter: brightness(1.1); }
+.actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.75rem; }
+
+/* Hero: the copy holds a reading column; the docket reaches right on wide screens. */
+.hero {
+  display: grid;
+  gap: 2.5rem;
+  padding-block: 2.5rem 4.5rem;
+  align-items: start;
+}
+.lede { font-size: 1.12rem; color: var(--ink-soft); }
+
+@media (min-width: 1040px) {
+  .hero { grid-template-columns: minmax(0, 31rem) minmax(0, 1fr); gap: 4.5rem; padding-top: 4rem; }
+}
+
+.docket {
+  margin: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1.5rem 1.5rem 1.25rem;
+}
+.docket-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.25rem 1rem; }
+.docket-product { font: 500 1.45rem/1.2 var(--catalog); margin: 0; }
+.docket-field { font-size: 0.88rem; color: var(--ink-soft); margin: 0; }
+.fix-text {
+  font: 400 1.12rem/1.65 var(--catalog);
+  white-space: pre-line;
+  margin: 1rem 0;
+  max-width: none;
+}
+ins { background: var(--cleared-wash); color: inherit; text-decoration: underline 1px var(--cleared); text-underline-offset: 3px; }
+del { background: var(--stopped-wash); color: inherit; text-decoration: line-through 1px var(--stopped); }
+.docket-note { font-size: 0.9rem; color: var(--ink-soft); }
+.docket figcaption { font-size: 0.82rem; color: var(--ink-soft); margin-top: 0.75rem; }
+
+/* The gate run. Twelve bars in a fixed order; a stopped check is taller and wider, so shape carries it too. */
+.gate-run { border-top: 1px solid var(--line); padding-top: 1rem; }
+.gates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 0.4rem;
+  align-items: end;
+}
+.gate { display: grid; justify-items: center; gap: 0.3rem; }
+.gate-bar {
+  width: 0.7rem;
+  height: 2.4rem;
+  border-radius: 1px;
+  background: var(--line);
+  transform-origin: bottom;
+  transition: background-color 180ms ease-out, transform 180ms ease-out;
+}
+.gate-passed .gate-bar { background: var(--cleared); }
+.gate-warned .gate-bar { background: var(--hold); transform: scaleY(1.15); }
+.gate-stopped .gate-bar { background: var(--stopped); width: 1rem; transform: scaleY(1.3); }
+.gate-id { font-size: 0.72rem; color: var(--ink-soft); }
+.gate-stopped .gate-id { color: var(--stopped); font-weight: 700; }
+.gate-caption { margin: 0.9rem 0 0; font-size: 0.95rem; color: var(--ink-soft); min-height: 1.6em; }
+.gate-caption-done { color: var(--hold); font-weight: 650; }
+
+@media (max-width: 560px) {
+  .masthead, main, .colophon { padding-inline: 1rem; }
+  .docket { padding: 1.1rem 1rem 1rem; }
+  .gates { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 0.75rem; }
+}
+
+/* How a fix moves. The steps are numbered because they are a sequence. */
+.steps-section, .numbers-section, .try-section { padding-block: 3rem; border-top: 1px solid var(--line); }
+.steps { list-style: none; margin: 0 0 2.5rem; padding: 0; counter-reset: step; display: grid; gap: 1.1rem; max-width: 68ch; }
+.steps li { counter-increment: step; display: grid; grid-template-columns: 2.25rem minmax(0, 1fr); }
+.steps li::before { content: counter(step); color: var(--ink-soft); font-weight: 650; }
+.steps li > * { grid-column: 2; }
+.steps p { margin: 0; }
+
+.stopped {
+  max-width: 44rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1.25rem 1.25rem 1rem;
+}
+.stopped-lede { font-size: 0.95rem; color: var(--ink-soft); }
+.stopped-line .catalog { font: 400 1.1rem/1.5 var(--catalog); background: var(--stopped-wash); }
+.stopped .gate-caption-done { color: var(--stopped); }
+
+.numbers { margin: 1.5rem 0; display: grid; gap: 1.25rem; max-width: 68ch; }
+.numbers div { display: grid; gap: 0.15rem; }
+.numbers dt { font-weight: 650; }
+.numbers dd { margin: 0; }
+.numbers strong { font-weight: 650; }
+.number-failed dt, .number-failed strong { color: var(--stopped); }
+.limits { color: var(--ink-soft); }
+
+.colophon { padding-block: 0 3rem; font-size: 0.88rem; color: var(--ink-soft); }
+.colophon p { border-top: 1px solid var(--line); padding-top: 2rem; max-width: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .gate-bar { transition: none; }
+}

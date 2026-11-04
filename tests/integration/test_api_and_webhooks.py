@@ -300,3 +300,41 @@ class TestReviewFlow:
             response.headers["X-Frame-Options"] == "DENY"
             and "frame-ancestors" in response.headers["Content-Security-Policy"]
         )
+
+
+class TestBuiltPages:
+    """The build has two pages: the landing page, and the review app that loads Shopify's Polaris components."""
+
+    @pytest.fixture
+    def pages(self, ctx, tmp_path):
+        (tmp_path / "assets").mkdir()
+        (tmp_path / "app").mkdir()
+        (tmp_path / "index.html").write_text("landing page")
+        (tmp_path / "app" / "index.html").write_text("review app")
+        settings = ctx.settings.model_copy(update={"static_dir": tmp_path})
+        with TestClient(create_app(settings, ctx)) as test_client:
+            yield test_client
+
+    @pytest.mark.parametrize("path", ["/app", "/app/", "/app/proposals/abc", "/app/activity"])
+    def test_the_review_app_answers_its_own_paths_and_may_load_polaris(self, pages, path):
+        response = pages.get(path)
+        directives = dict(part.strip().split(" ", 1) for part in response.headers["Content-Security-Policy"].split(";"))
+        assert response.text == "review app"
+        # Scripts: this origin and Shopify's own /shopifycloud/ path, never the whole CDN host and never inline.
+        assert directives["script-src"] == "'self' https://cdn.shopify.com/shopifycloud/"
+        # Polaris writes its own <style> blocks, loads its fonts from /static/fonts/ and fetches its icons.
+        assert directives["style-src"] == "'self' https://cdn.shopify.com/static/fonts/ 'unsafe-inline'"
+        assert directives["font-src"] == "'self' https://cdn.shopify.com/static/fonts/"
+        assert directives["connect-src"] == "'self' https://cdn.shopify.com/shopifycloud/"
+        assert directives["frame-ancestors"] == "'none'"
+
+    @pytest.mark.parametrize("path", ["/", "/apple", "/proposals/abc"])
+    def test_everything_else_is_the_landing_page_and_stays_same_origin(self, pages, path):
+        response = pages.get(path)
+        policy = response.headers["Content-Security-Policy"]
+        assert response.text == "landing page"
+        assert "cdn.shopify.com" not in policy and "unsafe-inline" not in policy
+
+    def test_the_api_never_allows_the_cdn(self, pages):
+        assert "cdn.shopify.com" not in pages.get("/api/meta").headers["Content-Security-Policy"]
+        assert pages.get("/api/nothing-here").status_code == 404

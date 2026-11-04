@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { api, type QueueItem } from "../api/client";
 import { GateStrip } from "../components/GateStrip";
-import { statusName } from "./Proposal";
+import { AppLink, ErrorBanner, Page, StatusBadge } from "../components/Page";
 
 const FILTERS: { key: string; label: string; statuses: string[] | null }[] = [
   { key: "open", label: "Needs review", statuses: ["pending_review"] },
@@ -15,13 +14,7 @@ const FILTERS: { key: string; label: string; statuses: string[] | null }[] = [
 
 function OpsNotice() {
   const { data, error } = useQuery({ queryKey: ["ops"], queryFn: api.ops, refetchInterval: 10000 });
-  if (error) {
-    return (
-      <p className="error" role="alert">
-        Could not check the health of background work: {error.message}
-      </p>
-    );
-  }
+  if (error) return <ErrorBanner>Could not check the health of background work: {error.message}</ErrorBanner>;
   if (!data) return null;
   const notes = [
     data.failed_writes && `${data.failed_writes} write(s) failed`,
@@ -32,22 +25,29 @@ function OpsNotice() {
   ].filter(Boolean);
   if (notes.length === 0) return null;
   return (
-    <p className="ops-notice" role="status">
-      Needs a person: {notes.join(", ")}. See the runbook.
-    </p>
+    <s-banner tone="warning" heading="Needs a person">
+      {notes.join(", ")}. See the runbook.
+    </s-banner>
   );
 }
 
 function Row({ item }: { item: QueueItem }) {
+  const linkId = `open-${item.id}`;
   return (
-    <li className="queue-row">
-      <Link to={`/proposals/${item.id}`} className="queue-title catalog-voice">
-        {item.title}
-      </Link>
-      <GateStrip failed={item.failed_rules} />
-      <span className={`status status-${item.status}`}>{statusName(item.status)}</span>
-      <span className="queue-risk">Risk {item.risk_score}</span>
-    </li>
+    <s-table-row clickDelegate={linkId}>
+      <s-table-cell>
+        <AppLink id={linkId} to={`/proposals/${item.id}`}>
+          {item.title}
+        </AppLink>
+      </s-table-cell>
+      <s-table-cell>
+        <GateStrip failed={item.failed_rules} />
+      </s-table-cell>
+      <s-table-cell>
+        <StatusBadge status={item.status} />
+      </s-table-cell>
+      <s-table-cell>{item.risk_score}</s-table-cell>
+    </s-table-row>
   );
 }
 
@@ -68,46 +68,63 @@ export function QueuePage() {
   const counts = data?.counts ?? {};
   const count = (statuses: string[] | null) =>
     (statuses ?? Object.keys(counts)).reduce((total, status) => total + (counts[status] ?? 0), 0);
+  const label = (option: (typeof FILTERS)[number]) => (data ? `${option.label} (${count(option.statuses)})` : option.label);
+
+  const audit =
+    me?.role === "admin" ? (
+      <s-button slot="primary-action" variant="primary" loading={run.isPending} onClick={() => run.mutate()}>
+        Audit more products
+      </s-button>
+    ) : undefined;
 
   return (
-    <>
-      <div className="page-head">
-        <h1>Review queue</h1>
-        {me?.role === "admin" && (
-          <button onClick={() => run.mutate()} disabled={run.isPending}>
-            Audit more products
-          </button>
+    <Page heading="Review queue" primaryAction={audit}>
+      <s-stack gap="base">
+        <OpsNotice />
+        {run.isError && <ErrorBanner>Could not start the audit: {run.error.message}</ErrorBanner>}
+        {run.isSuccess && (
+          <s-banner tone="success">Queued {run.data.queued} product(s). New fixes appear here within seconds.</s-banner>
         )}
-      </div>
-      <OpsNotice />
-      {run.isError && (
-        <p className="error" role="alert">
-          Could not start the audit: {run.error.message}
-        </p>
-      )}
-      {run.isSuccess && <p className="hint">Queued {run.data.queued} product(s). New fixes appear here within seconds.</p>}
-      <div className="filters" role="group" aria-label="Filter by status">
-        {FILTERS.map((option) => (
-          <button key={option.key} aria-pressed={filter === option.key} onClick={() => setFilter(option.key)}>
-            {option.label} ({count(option.statuses)})
-          </button>
-        ))}
-      </div>
-      {isLoading && <p className="hint">Loading the queue.</p>}
-      {error && (
-        <p className="error" role="alert">
-          Could not load the queue: {error.message}
-        </p>
-      )}
-      {data && items.length === 0 && <p className="hint">Nothing here. Choose another filter, or audit more products.</p>}
-      <ul className="queue">
-        {items.map((item) => (
-          <Row key={item.id} item={item} />
-        ))}
-      </ul>
-      <p className="hint gate-legend">
-        Each row shows the 12 checks in order. A red tick stopped the fix. An ochre tick is a warning for the reviewer.
-      </p>
-    </>
+        {error && <ErrorBanner>Could not load the queue: {error.message}</ErrorBanner>}
+        <s-section padding="none" accessibilityLabel="Proposed fixes">
+          {/* Polaris has no tabs. The admin's own filter pills are a filled button for the current view. */}
+          <div className="filters" role="group" aria-label="Filter by status">
+            {FILTERS.map((option) => (
+              <s-button
+                key={option.key}
+                variant={filter === option.key ? "secondary" : "tertiary"}
+                accessibilityLabel={`${label(option)}${filter === option.key ? ", selected" : ""}`}
+                onClick={() => setFilter(option.key)}
+              >
+                {label(option)}
+              </s-button>
+            ))}
+          </div>
+          <s-table loading={isLoading}>
+            <s-table-header-row>
+              <s-table-header listSlot="primary">Product</s-table-header>
+              <s-table-header listSlot="labeled">Checks</s-table-header>
+              <s-table-header listSlot="inline">Status</s-table-header>
+              <s-table-header listSlot="labeled" format="numeric">
+                Risk
+              </s-table-header>
+            </s-table-header-row>
+            <s-table-body>
+              {items.map((item) => (
+                <Row key={item.id} item={item} />
+              ))}
+            </s-table-body>
+          </s-table>
+          {data && items.length === 0 && (
+            <div className="empty">
+              <s-paragraph color="subdued">Nothing here. Choose another filter, or audit more products.</s-paragraph>
+            </div>
+          )}
+        </s-section>
+        <s-paragraph color="subdued">
+          Each row shows the 12 checks in order. A red tick stopped the fix. An ochre tick is a warning for the reviewer.
+        </s-paragraph>
+      </s-stack>
+    </Page>
   );
 }

@@ -12,7 +12,7 @@ An AI agent that audits and repairs a Shopify-style product catalog. It proposes
 docker compose up --build
 ```
 
-Open http://127.0.0.1:8000 and sign in with the filled-in demo token. Open a fix, read the diff and the checks, approve it, and watch it get written. "Edit as merchant" on the Products page sends a signed webhook, and any open fix for that product goes out of date.
+Open http://127.0.0.1:8000 for the landing page, or http://127.0.0.1:8000/app/ for the review screen, and sign in with the filled-in demo token. Open a fix, read the diff and the checks, approve it, and watch it get written. "Edit as merchant" on the Products page sends a signed webhook, and any open fix for that product goes out of date.
 
 ```bash
 python scripts/smoke.py
@@ -29,14 +29,14 @@ locally and not deployed yet.
 | Part | State |
 |---|---|
 | FastAPI, Postgres, pgvector, job queue, write-back, webhooks | **Ran for real**, in Docker and in tests against real Postgres |
-| React review UI | **Ran for real** in a browser, at 375, 768 and 1280 widths, light and dark |
+| Review UI (React on Shopify's Polaris web components) and landing page | **Ran for real** in a browser, at 375, 768 and 1280 widths, behind the real security headers. The landing page has light and dark; the review UI stays light, because Polaris documents no dark mode |
 | MCP server | **Ran for real** over streamable HTTP and through an in-process client |
 | Deterministic rules and citation checker | **Ran for real**, measured on synthetic data (`docs/EVAL.md`) |
 | RAG | **Ran for real**, on 19 chunks of invented policy, with lexical hashed embeddings, not a semantic model |
 | CI workflow | **Ran on GitHub once.** Six of seven jobs passed. `security` failed because gitleaks could not resolve the parent of the root commit on the first push, so it scanned nothing |
 | Hosted LLM provider and judge | **Ran for real, once**, on the dev split: 120 agent calls and 40 judge calls to a hosted LLM |
 | Agent behaviour, cost, latency | **Measured once on 40 synthetic products** (see Results). Repair quality has no automatic score. The policy search and citation path was never used by the real model |
-| Free public demo (one container, Render and Neon) | **Rehearsed locally, not deployed.** `docker-compose.public.yml` with `scripts/smoke_public.py` passed on 2026-11-03; output in `eval/reports/checks-2026-11-03/` |
+| Free public demo (one container, Render and Neon) | **Rehearsed locally, not deployed.** `docker-compose.public.yml` with `scripts/smoke_public.py` passed on 2026-11-03 and again on 2026-11-04 with the Polaris UI and the landing page; output in `eval/reports/checks-2026-11-04/` |
 | Live Shopify adapter | **Written, not run.** Tested against a mocked GraphQL server only, token renewal included. It has never called a store |
 | Terraform for ECS and RDS | **Validated with `terraform validate`, never applied** |
 
@@ -101,6 +101,7 @@ On Windows use `.venv\Scripts\activate`. Tests use real Postgres, not mocks. Cov
 - Only the first 25 variants and 10 media of a product are read from a live store.
 - With `SHOPIFY_CLIENT_ID` and `SHOPIFY_CLIENT_SECRET`, the live adapter renews its 24-hour token itself. That is tested against mocked HTTP only.
 - The eval data is synthetic. Its author also wrote the rules.
+- The review UI loads Polaris from `cdn.shopify.com` at run time, so it needs that CDN to be reachable, and Shopify's script runs with the reviewer's token in reach. Without the CDN the page says it could not load. The `/app` pages allow only Shopify's `/shopifycloud/` and `/static/fonts/` paths on that host, not the merchant uploads it also serves, and inline styles, because Polaris writes its own `<style>` blocks. No inline script is allowed.
 
 ## Steps only the owner can do
 

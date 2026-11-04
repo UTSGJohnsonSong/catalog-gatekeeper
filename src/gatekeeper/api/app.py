@@ -45,6 +45,27 @@ from gatekeeper.worker import configure_logging
 log = logging.getLogger("gatekeeper.api")
 MAX_WEBHOOK_BYTES = 5 * 1024 * 1024
 ADDRESS_CHECKS_LOGGED = 5
+# The review app under /app is built from Shopify's Polaris web components. Only those pages allow two paths on
+# Shopify's CDN, and not the whole host, which also serves files that any merchant uploads (/s/files/):
+# /shopifycloud/ for the script and the icons it fetches, and /static/fonts/ for its font stylesheets and fonts.
+# Polaris also writes <style> blocks of its own; hashes of them would break whenever Shopify updates polaris-2.js,
+# so these pages allow inline styles. That needs an HTML injection to abuse, and the app renders catalog text as
+# text only. No inline script is allowed anywhere. The landing page and the API stay same-origin.
+POLARIS_CODE = "https://cdn.shopify.com/shopifycloud/"
+POLARIS_FONTS = "https://cdn.shopify.com/static/fonts/"
+_CSP_TAIL = "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+SAME_ORIGIN_CSP = f"default-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; {_CSP_TAIL}"
+REVIEW_APP_CSP = (
+    f"default-src 'self'; script-src 'self' {POLARIS_CODE}; style-src 'self' {POLARIS_FONTS} 'unsafe-inline'; "
+    f"font-src 'self' {POLARIS_FONTS}; img-src 'self' data: {POLARIS_CODE}; connect-src 'self' {POLARIS_CODE}; "
+    f"{_CSP_TAIL}"
+)
+
+
+def is_review_app_path(path: str) -> bool:
+    return path == "/app" or path.startswith("/app/")
+
+
 JUDGE_NAMES = {
     "J00": "JUDGE_UNAVAILABLE",
     "J01": "JUDGE_UNSUPPORTED_CLAIM",
@@ -148,8 +169,7 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
         if in_production or settings.public_demo:
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
         response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; frame-ancestors 'none'; "
-            "base-uri 'none'; form-action 'self'"
+            REVIEW_APP_CSP if is_review_app_path(request.url.path) else SAME_ORIGIN_CSP
         )
         return response
 
@@ -479,6 +499,9 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
         def spa(path: str) -> FileResponse:
             if path.startswith(("api/", "webhooks/", "demo/")):
                 raise HTTPException(404)
+            # Two pages: the review app owns /app and everything under it, the landing page answers the rest.
+            if is_review_app_path(f"/{path}"):
+                return FileResponse(Path(static) / "app" / "index.html")
             return FileResponse(Path(static) / "index.html")
 
     return app

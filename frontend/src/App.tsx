@@ -1,43 +1,32 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { ApiError, api, getToken, setToken } from "./api/client";
-import { ActivityPage, LoginPage, ProductsPage } from "./pages/Other";
+import { ActivityPage, LoginPage, NotFoundPage, ProductsPage } from "./pages/Other";
 import { ProposalPage } from "./pages/Proposal";
 import { QueuePage } from "./pages/Queue";
 
-export function ModeBanner() {
-  const { data: meta, isError } = useQuery({ queryKey: ["meta"], queryFn: api.meta, refetchInterval: 15000 });
-  // No banner must not look like live mode: an unknown mode is said out loud.
-  if (isError) return <p className="mode-banner">Could not confirm which model and store this is using.</p>;
-  if (!meta) return null;
-  const notes: string[] = [];
-  if (meta.model_mode === "demo") notes.push("Demo model: fixes come from a template script, not an LLM.");
-  if (meta.shopify_adapter === "fixture") notes.push("The store is simulated.");
-  if (meta.demo_mode) notes.push("Demo sign-in is on.");
-  if (meta.public_demo) {
-    notes.push(`This is a shared sandbox: other visitors see what you do, and it resets every ${meta.demo_reset_minutes} minutes.`);
-  }
-  if (!meta.writeback_shop_enabled || !meta.writeback_env_enabled) notes.push("Writing to the store is switched off.");
-  if (notes.length === 0) return null;
-  return <p className="mode-banner">{notes.join(" ")}</p>;
-}
+export { ModeBanner } from "./components/ModeBanner";
 
+// Polaris has no navigation component outside the Shopify admin, so the top bar is ours.
 export function App() {
   const client = useQueryClient();
   const [signedIn, setSignedIn] = useState(Boolean(getToken()));
   const { data: meta } = useQuery({ queryKey: ["meta"], queryFn: api.meta });
   const { error } = useQuery({ queryKey: ["whoami"], queryFn: api.whoami, enabled: signedIn, retry: false });
 
-  if (signedIn && error instanceof ApiError && error.status === 401) {
+  const expired = signedIn && error instanceof ApiError && error.status === 401;
+  useEffect(() => {
+    if (!expired) return;
     setToken(null);
+    // Without this the cached 401 would sign the next sign-in straight out again.
+    client.clear();
     setSignedIn(false);
-  }
+  }, [expired, client]);
 
   return (
     <>
-      <ModeBanner />
-      <header className="top">
+      <header className="app-bar">
         <a className="brand" href="/">
           Catalog Gatekeeper
         </a>
@@ -49,7 +38,8 @@ export function App() {
             <NavLink to="/products">Products</NavLink>
             <NavLink to="/activity">Activity</NavLink>
             <button
-              className="link"
+              type="button"
+              className="sign-out"
               onClick={() => {
                 setToken(null);
                 client.clear();
@@ -61,7 +51,8 @@ export function App() {
           </nav>
         )}
       </header>
-      <main>
+      {/* Each Polaris page brings its own main landmark. */}
+      <div className="app-main">
         {!signedIn ? (
           <LoginPage demoToken={meta?.demo_token ?? null} key={String(meta?.demo_token)} onDone={() => setSignedIn(true)} />
         ) : (
@@ -70,10 +61,26 @@ export function App() {
             <Route path="/proposals/:id" element={<ProposalPage />} />
             <Route path="/products" element={<ProductsPage />} />
             <Route path="/activity" element={<ActivityPage />} />
-            <Route path="*" element={<p className="hint">This page does not exist.</p>} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         )}
-      </main>
+      </div>
     </>
+  );
+}
+
+// Shown instead of the app when Shopify's CDN did not deliver the components: empty shells would look broken.
+export function ComponentsMissing() {
+  return (
+    <main className="components-missing">
+      <h1>The review screen could not load</h1>
+      <p>
+        It is built from Shopify&apos;s Polaris components, which load from cdn.shopify.com, and they did not arrive. Check the
+        connection or any content blocker, then reload the page.
+      </p>
+      <p>
+        <a href="/">Back to the overview</a>
+      </p>
+    </main>
   );
 }

@@ -1,0 +1,181 @@
+{
+  "source": "Captured 2026-11-04 from the local Docker demo at commit 759dbc1: simulated store, template script heuristic-v1, no LLM.",
+  "fixes": [
+    {
+      "product_title": "Trailhead Daypack 20L",
+      "status": "pending_review",
+      "model": "heuristic-v1",
+      "field": "description_html",
+      "before": [
+        "Nice bags item."
+      ],
+      "after": [
+        "Trailhead Daypack 20L by Northline belongs to our bags range.",
+        "Nice bags item.",
+        "Choose from: Moss, Slate.",
+        "Check the product details on this page before you choose.",
+        "Bags and backpacks carry a 5 year warranty on zippers, stitching and buckles."
+      ],
+      "checks": [
+        {
+          "rule_id": "V01",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V02",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V03",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V04",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V05",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V06",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V07",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V08",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V09",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V10",
+          "passed": true,
+          "severity": "warn"
+        },
+        {
+          "rule_id": "V11",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V12",
+          "passed": true,
+          "severity": "block"
+        }
+      ],
+      "citations": [
+        {
+          "quote": "Bags and backpacks carry a 5 year warranty on zippers, stitching and buckles.",
+          "chunk_id": "warranty#000",
+          "verified": true
+        }
+      ],
+      "findings": [
+        {
+          "rule_id": "A02",
+          "name": "DESC_THIN"
+        }
+      ]
+    },
+    {
+      "product_title": "Waxed Canvas Pencil Roll",
+      "status": "blocked",
+      "model": "heuristic-v1",
+      "field": "description_html",
+      "before": [
+        "Good stationery piece."
+      ],
+      "after": [
+        "Waxed Canvas Pencil Roll by Fable Canvas belongs to our stationery range.",
+        "Good stationery piece.",
+        "Choose from: Tan.",
+        "Check the product details on this page before you choose.",
+        "More at www.example-deals.com today."
+      ],
+      "checks": [
+        {
+          "rule_id": "V01",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V02",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V03",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V04",
+          "passed": false,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V05",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V06",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V07",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V08",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V09",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V10",
+          "passed": true,
+          "severity": "warn"
+        },
+        {
+          "rule_id": "V11",
+          "passed": true,
+          "severity": "block"
+        },
+        {
+          "rule_id": "V12",
+          "passed": true,
+          "severity": "block"
+        }
+      ],
+      "citations": [],
+      "findings": [
+        {
+          "rule_id": "A02",
+          "name": "DESC_THIN"
+        }
+      ]
+    }
+  ]
+}

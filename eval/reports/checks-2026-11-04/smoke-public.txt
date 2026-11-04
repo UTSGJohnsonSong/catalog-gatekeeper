@@ -1,0 +1,16 @@
+ok   API is up as a public demo with the template model
+ok   the sign-in page is offered the reviewer token, not the admin one
+ok   the landing page is served and allows no other origin
+ok   the review app answers its deep links and may load Polaris scripts, but no inline script
+ok   the admin demo token is refused
+ok   the reviewer token works
+ok   visitors cannot switch write-back off
+ok   a visitor can approve a fix
+ok   the fix was written and verified
+ok   a simulated merchant edit delivers its signed webhook over loopback
+ok   the open fix went stale after the merchant edit
+ok   a body over the cap is refused before parsing
+ok   rapid changes are rate limited
+ok   a forged X-Forwarded-For buys no fresh allowance
+ok   even a refused request carries the security headers
+PUBLIC SMOKE PASSED (store simulated, model is a template script, not an LLM)

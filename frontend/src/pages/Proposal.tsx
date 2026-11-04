@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { ApiError, api, type ProposalDetail } from "../api/client";
 import { DecisionBar } from "../components/DecisionBar";
 import { DiffPanel } from "../components/DiffPanel";
 import { Gate } from "../components/Gate";
+import { AppLink, ErrorBanner, Page, StatusBadge } from "../components/Page";
 
 const JUDGE_SENTENCE: Record<string, string> = {
   disabled: "The LLM judge did not run.",
@@ -13,30 +14,15 @@ const JUDGE_SENTENCE: Record<string, string> = {
   unavailable: "The LLM judge failed, so nobody has assessed this. Risk was raised to reflect that.",
 };
 
-const STATUS_NAMES: Record<string, string> = {
-  pending_review: "Needs review",
-  blocked: "Blocked",
-  approved: "Approved",
-  applying: "Writing",
-  applied: "Written",
-  rejected: "Rejected",
-  stale: "Out of date",
-  failed: "Write failed",
-};
-
-export function statusName(status: string): string {
-  return STATUS_NAMES[status] ?? status;
-}
-
 function ModelLine({ proposal }: { proposal: ProposalDetail }) {
   if (proposal.model_mode === "demo") {
-    return <p className="hint">Drafted by {proposal.model}, a template script. No LLM wrote this.</p>;
+    return <s-paragraph color="subdued">Drafted by {proposal.model}, a template script. No LLM wrote this.</s-paragraph>;
   }
   return (
-    <p className="hint">
+    <s-paragraph color="subdued">
       Drafted by {proposal.model ?? "an unknown model"}. {JUDGE_SENTENCE[proposal.judge_status] ?? proposal.judge_status}
       {proposal.judge_discarded > 0 && ` It raised ${proposal.judge_discarded} concern(s) with quotes that could not be found, so they were dropped.`}
-    </p>
+    </s-paragraph>
   );
 }
 
@@ -77,80 +63,29 @@ export function ProposalPage() {
   });
   const reject = useMutation({ mutationFn: (note: string) => api.reject(id, note), onSuccess: settle, onError });
 
-  if (isLoading) return <p className="hint">Loading the proposal.</p>;
-  if (loadError || !proposal) {
+  const back = { to: "/", label: "Review queue" };
+  if (isLoading) {
     return (
-      <p className="error" role="alert">
-        Could not load this proposal: {loadError?.message ?? "not found"}. <Link to="/">Go back to the queue.</Link>
-      </p>
+      <Page heading="Proposed fix" breadcrumb={back}>
+        <s-paragraph color="subdued">Loading the proposal.</s-paragraph>
+      </Page>
+    );
+  }
+  if (!proposal) {
+    return (
+      <Page heading="Proposed fix" breadcrumb={back}>
+        <ErrorBanner>
+          Could not load this proposal: {loadError?.message ?? "not found"}. <AppLink to="/">Go back to the queue.</AppLink>
+        </ErrorBanner>
+      </Page>
     );
   }
 
-  return (
-    <div className="proposal">
-      <div className="proposal-main">
-        <p className="crumb">
-          <Link to="/">Review queue</Link>
-        </p>
-        <h1 className="catalog-voice">{proposal.product_title}</h1>
-        <p className={`status status-${proposal.status}`}>
-          {statusName(proposal.status)}, risk {proposal.risk_score}
-        </p>
-        <ModelLine proposal={proposal} />
-        {proposal.run_flags.map((flag) => (
-          <p className="flag" key={flag}>
-            {FLAG_SENTENCE[flag] ?? flag}
-          </p>
-        ))}
-        {proposal.risk_reasons.length > 0 && <p className="hint">Risk comes from: {proposal.risk_reasons.join("; ")}.</p>}
-
-        <h2>What would change</h2>
-        <DiffPanel diffs={proposal.diffs} />
-
-        {proposal.rationale && (
-          <>
-            <h2>Why the fix was proposed</h2>
-            <p>{proposal.rationale}</p>
-          </>
-        )}
-
-        {proposal.citations.length > 0 && (
-          <>
-            <h2>Store policy it relied on</h2>
-            <ul className="citations">
-              {proposal.citations.map((citation) => (
-                <li key={`${citation.chunk_id}${citation.quote}`}>
-                  <blockquote className="catalog-voice">{citation.quote}</blockquote>
-                  <p className={citation.verified ? "verified" : "unverified"}>
-                    {citation.verified
-                      ? `Matches ${citation.chunk_id} word for word, and that passage was retrieved during this run.`
-                      : `Could not be verified against ${citation.chunk_id || "the policy documents"} (${citation.reason}).`}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-
-        <h2>Open findings on this product</h2>
-        {proposal.findings.filter((f) => f.status === "open").length === 0 ? (
-          <p className="hint">None. Every audit rule passes on the current product.</p>
-        ) : (
-          <ul className="findings">
-            {proposal.findings
-              .filter((f) => f.status === "open")
-              .map((f) => (
-                <li key={`${f.rule_id}${f.subject}`}>
-                  <span className="gate-id">{f.rule_id}</span> {f.name.toLowerCase().replaceAll("_", " ")},{" "}
-                  {f.severity} severity{f.fixable ? "" : ", needs a person"}
-                </li>
-              ))}
-          </ul>
-        )}
-      </div>
-
-      <aside className="gate" aria-label="Checks and decision">
-        <h2>The gate</h2>
+  const openFindings = proposal.findings.filter((f) => f.status === "open");
+  // Polaris draws a section in the aside without padding, so the gate brings its own box.
+  const gate = (
+    <s-section slot="aside" heading="The gate">
+      <s-box padding="base" background="base" borderRadius="large-200">
         <Gate rows={proposal.validation} />
         <DecisionBar
           proposal={proposal}
@@ -166,7 +101,73 @@ export function ProposalPage() {
             reject.mutate(note);
           }}
         />
-      </aside>
-    </div>
+      </s-box>
+    </s-section>
+  );
+
+  return (
+    <Page heading={proposal.product_title} breadcrumb={back} aside={gate}>
+      {loadError && (
+        <ErrorBanner>Could not refresh this proposal: {loadError.message}. What you see may be out of date.</ErrorBanner>
+      )}
+      <s-section>
+        <s-stack gap="small-200">
+          <s-stack direction="inline" gap="small-200" alignItems="center">
+            <StatusBadge status={proposal.status} />
+            <s-text>Risk {proposal.risk_score}</s-text>
+          </s-stack>
+          <ModelLine proposal={proposal} />
+          {proposal.run_flags.map((flag) => (
+            <s-paragraph tone="caution" key={flag}>
+              {FLAG_SENTENCE[flag] ?? flag}
+            </s-paragraph>
+          ))}
+          {proposal.risk_reasons.length > 0 && (
+            <s-paragraph color="subdued">Risk comes from: {proposal.risk_reasons.join("; ")}.</s-paragraph>
+          )}
+        </s-stack>
+      </s-section>
+
+      <s-section heading="What would change">
+        <DiffPanel diffs={proposal.diffs} />
+      </s-section>
+
+      {proposal.rationale && (
+        <s-section heading="Why the fix was proposed">
+          <s-paragraph>{proposal.rationale}</s-paragraph>
+        </s-section>
+      )}
+
+      {proposal.citations.length > 0 && (
+        <s-section heading="Store policy it relied on">
+          <ul className="citations">
+            {proposal.citations.map((citation) => (
+              <li key={`${citation.chunk_id}${citation.quote}`}>
+                <blockquote>{citation.quote}</blockquote>
+                <s-paragraph tone={citation.verified ? "success" : "critical"}>
+                  {citation.verified
+                    ? `Matches ${citation.chunk_id} word for word, and that passage was retrieved during this run.`
+                    : `Could not be verified against ${citation.chunk_id || "the policy documents"} (${citation.reason}).`}
+                </s-paragraph>
+              </li>
+            ))}
+          </ul>
+        </s-section>
+      )}
+
+      <s-section heading="Open findings on this product">
+        {openFindings.length === 0 ? (
+          <s-paragraph color="subdued">None. Every audit rule passes on the current product.</s-paragraph>
+        ) : (
+          <s-unordered-list>
+            {openFindings.map((f) => (
+              <s-list-item key={`${f.rule_id}${f.subject}`}>
+                {f.rule_id} {f.name.toLowerCase().replaceAll("_", " ")}, {f.severity} severity{f.fixable ? "" : ", needs a person"}
+              </s-list-item>
+            ))}
+          </s-unordered-list>
+        )}
+      </s-section>
+    </Page>
   );
 }

@@ -46,6 +46,20 @@ def call(
         return error.code, parsed, _lower(error.headers.items())
 
 
+def page(path: str) -> tuple[int, str, dict[str, str]]:
+    """A page of the built frontend, as a browser would get it."""
+    request = urllib.request.Request(BASE + path, method="GET")  # noqa: S310
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+            return response.status, response.read().decode(errors="replace"), _lower(response.headers.items())
+    except urllib.error.HTTPError as error:
+        return error.code, error.read().decode(errors="replace"), _lower(error.headers.items())
+
+
+def directives(policy: str) -> dict[str, str]:
+    return dict(part.strip().split(" ", 1) for part in policy.split(";") if part.strip())
+
+
 def _lower(items) -> dict[str, str]:
     """Header names are case-insensitive, and the server sends them in lower case."""
     return {name.lower(): value for name, value in items}
@@ -76,6 +90,25 @@ def main() -> int:
     meta = wait_for("the API", lambda: (lambda r: r[1] if r[0] == 200 else None)(call("GET", "/api/meta", token=None)))
     expect(meta["public_demo"] and meta["model_mode"] == "demo", "API is up as a public demo with the template model")
     expect(meta["demo_token"] == TOKEN, "the sign-in page is offered the reviewer token, not the admin one", meta)
+    status, html, headers = page("/")
+    landing_policy = directives(headers.get("content-security-policy", ""))
+    expect(
+        status == 200
+        and "<title>Catalog Gatekeeper</title>" in html
+        and landing_policy.get("default-src") == "'self'"
+        and "cdn.shopify.com" not in str(landing_policy),
+        "the landing page is served and allows no other origin",
+        (status, landing_policy),
+    )
+    status, html, headers = page("/app/proposals/any")
+    app_policy = directives(headers.get("content-security-policy", ""))
+    expect(
+        status == 200
+        and "polaris-2.js" in html
+        and app_policy.get("script-src") == "'self' https://cdn.shopify.com/shopifycloud/",
+        "the review app answers its deep links and may load Polaris scripts, but no inline script",
+        (status, app_policy),
+    )
     refused = call("GET", "/api/whoami", token=REFUSED_TOKEN)[0]
     expect(refused == 401, "the admin demo token is refused", refused)
     me = call("GET", "/api/whoami")[1]
