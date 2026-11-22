@@ -8,7 +8,7 @@
  "frozen_test_split_intact": true,
  "gate": "PASS",
  "gate_failures": [],
- "git_sha": "7ce3d50f",
+ "git_sha": "621a0409",
  "latency_ms": {
   "p50": 0.7631000044057146,
   "p95": 1.2919999862788245

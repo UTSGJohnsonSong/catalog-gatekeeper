@@ -75,7 +75,7 @@
  "dataset_test_sha256": "463d3008423fcd1a225920d568dded514ee1e77405c946a1f72fd2e43152cd39",
  "gate": "NOT_GATED",
  "gate_failures": [],
- "git_sha": "66a1eca4",
+ "git_sha": "19607a46",
  "limits": [
   "All data is synthetic. Labels are true by construction, and defect rates here are not real-world prevalence.",
   "The same engineer wrote the rules and the datasets, so independence is procedural, not absolute.",

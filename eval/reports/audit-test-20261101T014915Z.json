@@ -9,7 +9,7 @@
  "gate_failures": [
   "A13 recall: 0.3333 is below 0.5"
  ],
- "git_sha": "7ce3d50f",
+ "git_sha": "621a0409",
  "kinds": {
   "clean": 60,
   "hard_negative": 18,

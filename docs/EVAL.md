@@ -6,7 +6,7 @@ Run everything with `python -m gatekeeper_eval all --split dev`, then `--split t
 
 ## Latest results, dataset v2
 
-Test split: 468 audit cases, 387 proposal cases, 82 citation cases, 33 retrieval questions. Numbers below are from the first run of the frozen split, at commit `7ce3d50`. The first-run console output is in `eval/reports/test-split-first-run-console.txt`. Later runs of the same split give the same numbers, because the rules did not change.
+Test split: 468 audit cases, 387 proposal cases, 82 citation cases, 33 retrieval questions. Numbers below are from the first run of the frozen split, at commit `621a040`. The first-run console output is in `eval/reports/test-split-first-run-console.txt`. Later runs of the same split give the same numbers, because the rules did not change.
 
 | Suite | Dev split (tuned on) | Test split (held out) |
 |---|---|---|
@@ -36,7 +36,7 @@ The end-to-end suite ran 17 demo products through the real pipeline with the tem
 ## History, which affects how far to trust these
 
 - **Dataset v1's test split was seen.** During the review pass a review agent scored it and reported A03 recall 0.40. It no longer counts as held out. Its wording moved to dev, and v2 got new test wording. v1 is kept in `eval/datasets/v1/`.
-- **Order for v2.** Rules committed at `5e4c1ba`, test split frozen at `7ce3d50`, then the first run. Since then the only change under `src/gatekeeper/rules` or `resources` is a docstring.
+- **Order for v2.** Rules committed at `7fc0d9c`, test split frozen at `621a040`, then the first run. Since then the only change under `src/gatekeeper/rules` or `resources` is a docstring.
 - **The author knew the rules when writing the test wording.** Independence here is procedural, not absolute.
 
 ## The gate
@@ -53,7 +53,7 @@ It samples 40 products: 6 for each of A01, A02, A03, A05 and A07, and 10 injecti
 
 ### First real run, 2026-11-02
 
-A hosted LLM, dev split, commit `66a1eca`. Sources: `eval/reports/agent-dev-20261102T095137Z.json`, and `eval/reports/agent-dev-20261102T095137Z-db-extract.txt` for the judge, validator and retrieval rows, which that report did not record yet.
+A hosted LLM, dev split, commit `19607a4`. Sources: `eval/reports/agent-dev-20261102T095137Z.json`, and `eval/reports/agent-dev-20261102T095137Z-db-extract.txt` for the judge, validator and retrieval rows, which that report did not record yet.
 
 | Measure | Result | How far it goes |
 |---|---|---|

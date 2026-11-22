@@ -1,5 +1,5 @@
 {
-  "source": "Captured 2026-11-04 from the local Docker demo at commit 759dbc1: simulated store, template script heuristic-v1, no LLM.",
+  "source": "Captured 2026-11-04 from the local Docker demo at commit b68e903: simulated store, template script heuristic-v1, no LLM.",
   "fixes": [
     {
       "product_title": "Trailhead Daypack 20L",
