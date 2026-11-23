@@ -60,8 +60,14 @@ services:
       # A second Neon database, not the demo's: the demo refuses a database that holds a store token.
       - key: DATABASE_URL
         sync: false
+      # Postgres roles belong to the server, not to one database. With both databases on one Neon branch, each
+      # service's boot would reset the shared gatekeeper_app role to its own password and lock the other out, so
+      # the app takes the demo's value.
       - key: APP_DB_PASSWORD
-        generateValue: true
+        fromService:
+          type: web
+          name: catalog-gatekeeper-demo
+          envVarKey: APP_DB_PASSWORD
       - key: ENV
         value: production
       - key: SHOPIFY_ADAPTER
