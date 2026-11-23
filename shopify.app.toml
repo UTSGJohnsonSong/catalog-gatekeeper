@@ -1,0 +1,30 @@
+# The app's configuration in Shopify, for the embedded mode in docs/EMBEDDED.md and docs/adr/0013.
+# Replace the two placeholders, then either run `shopify app deploy` or enter the same values in the Dev Dashboard.
+# Neither the client ID nor the host is a secret: both appear in the review page. The client secret never goes here.
+
+client_id = "REPLACE_WITH_CLIENT_ID"
+name = "Catalog Gatekeeper"
+application_url = "https://REPLACE_WITH_APP_HOST/app/"
+embedded = true
+
+[access_scopes]
+# Products only. The app never reads customers or orders.
+scopes = "read_products,write_products"
+
+[auth]
+redirect_urls = ["https://REPLACE_WITH_APP_HOST/app/"]
+
+[webhooks]
+api_version = "2026-10"
+
+  [[webhooks.subscriptions]]
+  topics = ["app/uninstalled", "products/create", "products/update", "products/delete"]
+  uri = "https://REPLACE_WITH_APP_HOST/webhooks/shopify"
+
+  # Mandatory for App Store apps. The app holds no customer data; shop/redact erases the store's catalog.
+  [[webhooks.subscriptions]]
+  compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+  uri = "https://REPLACE_WITH_APP_HOST/webhooks/shopify"
+
+[build]
+automatically_update_urls_on_dev = false

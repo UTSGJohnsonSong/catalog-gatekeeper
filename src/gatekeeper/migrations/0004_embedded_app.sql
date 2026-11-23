@@ -1,4 +1,4 @@
--- Embedded app (docs/adr/0011): the store's offline token, encrypted, and the install lifecycle of a store.
+-- Embedded app (docs/adr/0013): the store's offline token, encrypted, and the install lifecycle of a store.
 ALTER TABLE shops
   ADD COLUMN installed_at timestamptz,
   ADD COLUMN uninstalled_at timestamptz,

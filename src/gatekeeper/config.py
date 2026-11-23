@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     shopify_webhook_secret: SecretStr | None = None
     writeback_enabled: bool = False
     # Embedded mode: the review app opens inside the Shopify admin of one store. Merchants sign in with App Bridge
-    # session tokens, and the store's expiring offline token is kept in the database, encrypted. See docs/adr/0011.
+    # session tokens, and the store's expiring offline token is kept in the database, encrypted. See docs/adr/0013.
     shopify_embedded: bool = False
     # 32 random bytes, base64. Losing the key costs nothing worse than the merchant opening the app once to reconnect.
     token_encryption_key: SecretStr | None = Field(default=None, repr=False)

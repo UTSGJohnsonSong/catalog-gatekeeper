@@ -27,7 +27,7 @@ ACTOR = "shopify-lifecycle"
 
 # Rows that hold the store's catalog or the work done on it, children before parents. The audit log keeps its rows:
 # the database refuses to change them, by trigger and by grant. They carry ids, statuses, counts and actor names,
-# plus any note a reviewer typed when rejecting a fix (docs/adr/0011 lists that as a known limit).
+# plus any note a reviewer typed when rejecting a fix (docs/adr/0013 lists that as a known limit).
 _ERASE: tuple[tuple[str, str], ...] = (
     ("writebacks", "proposal_id IN (SELECT id FROM proposals WHERE shop_id = %s)"),
     ("reviews", "proposal_id IN (SELECT id FROM proposals WHERE shop_id = %s)"),

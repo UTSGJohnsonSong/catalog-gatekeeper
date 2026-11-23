@@ -1,5 +1,8 @@
-# The free public demo: one web service on Render's free plan, with a free Neon Postgres as DATABASE_URL.
-# Steps, limits and what this exposes are in docs/DEPLOY_DEMO.md. Nothing here costs money or holds a real key.
+# Two free web services on Render, each with its own free Neon database.
+# - catalog-gatekeeper-demo: the public demo on a simulated store. docs/DEPLOY_DEMO.md. Holds no real key.
+# - catalog-gatekeeper-app: the embedded app for one development store. docs/EMBEDDED.md. Holds the app's client
+#   secret and the token key, entered in Render, never in this file. It drafts with the template model, so it spends
+#   nothing on a model.
 services:
   - type: web
     name: catalog-gatekeeper-demo
@@ -36,6 +39,53 @@ services:
         value: heuristic
       # Under-counting proxies is safe: visitors then share buckets. Over-counting lets them forge their address.
       - key: TRUSTED_PROXY_HOPS
+        value: "1"
+      - key: FIXTURES_DIR
+        value: /app/fixtures
+      - key: STATIC_DIR
+        value: /app/static
+
+  - type: web
+    name: catalog-gatekeeper-app
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    # Setup, then the API and the worker. Before the first open in the admin there is no store token, and the first
+    # sync is skipped; opening the app connects the store and queues one.
+    dockerCommand: python -m gatekeeper.allinone
+    healthCheckPath: /healthz
+    autoDeployTrigger: "off"
+    envVars:
+      # A second Neon database, not the demo's: the demo refuses a database that holds a store token.
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_DB_PASSWORD
+        generateValue: true
+      - key: ENV
+        value: production
+      - key: SHOPIFY_ADAPTER
+        value: live
+      - key: SHOPIFY_EMBEDDED
+        value: "1"
+      # The development store, for example your-store.myshopify.com.
+      - key: SHOPIFY_SHOP_DOMAIN
+        sync: false
+      - key: SHOPIFY_CLIENT_ID
+        sync: false
+      - key: SHOPIFY_CLIENT_SECRET
+        sync: false
+      # 32 random bytes in base64; docs/EMBEDDED.md shows one way to make them.
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: WRITEBACK_ENABLED
+        value: "1"
+      # The template model drafts the fixes, and may write only to a store Shopify reports as a development store.
+      - key: LLM_PROVIDER
+        value: heuristic
+      - key: ALLOW_DEMO_MODEL_IN_PROD
+        value: "1"
+      - key: ALLOW_TEMPLATE_WRITES_TO_DEV_STORE
         value: "1"
       - key: FIXTURES_DIR
         value: /app/fixtures

@@ -412,3 +412,42 @@ def test_outside_embedded_mode_the_session_call_does_not_exist():
     with TestClient(create_app(Settings(env="test"), ctx=SimpleNamespace())) as client:  # type: ignore[arg-type]
         response = client.post("/api/shopify/session", headers={"Authorization": "Bearer a.b.c"})
     assert response.status_code == 404
+
+
+# The Render blueprint ----------------------------------------------------------------------------------------------
+
+BLUEPRINT = Path(__file__).resolve().parents[2] / "render.yaml"
+SENSITIVE = ("SECRET", "KEY", "TOKEN", "PASSWORD", "DATABASE_URL")
+
+
+def services() -> dict[str, dict[str, dict]]:
+    import yaml
+
+    loaded = yaml.safe_load(BLUEPRINT.read_text(encoding="utf-8"))
+    return {s["name"]: {v["key"]: v for v in s["envVars"]} for s in loaded["services"]}
+
+
+def test_the_blueprint_writes_no_secret_into_the_repository():
+    for name, env in services().items():
+        for key, entry in env.items():
+            if any(word in key for word in SENSITIVE):
+                assert "value" not in entry, f"{name}: {key} must be entered in Render or generated, not written here"
+
+
+def test_the_public_demo_holds_no_store_credentials_or_model_key():
+    demo = services()["catalog-gatekeeper-demo"]
+    assert not {"SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET", "ANTHROPIC_API_KEY", "TOKEN_ENCRYPTION_KEY"} & set(demo)
+
+
+def test_the_embedded_service_boots_with_its_blueprint_values():
+    app = services()["catalog-gatekeeper-app"]
+    values = {key.lower(): entry["value"] for key, entry in app.items() if "value" in entry}
+    values.pop("fixtures_dir"), values.pop("static_dir")
+    entered = {
+        "shopify_shop_domain": SHOP,
+        "shopify_client_id": CLIENT_ID,
+        "shopify_client_secret": SECRET,
+        "token_encryption_key": KEY,
+    }
+    settings = Settings(**values, **entered)  # type: ignore[arg-type]
+    assert settings.env == "production" and settings.shopify_embedded and settings.uses_template_model

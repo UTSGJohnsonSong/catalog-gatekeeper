@@ -1,4 +1,4 @@
-"""Expiring offline tokens for the embedded app, kept in Postgres and encrypted. See docs/adr/0011.
+"""Expiring offline tokens for the embedded app, kept in Postgres and encrypted. See docs/adr/0013.
 
 Managed installation installs the app without calling it. The first time a merchant opens the app, the frontend's
 session token is exchanged for an offline token. Offline tokens now expire after an hour and come with a refresh
