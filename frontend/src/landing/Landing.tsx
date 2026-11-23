@@ -231,7 +231,7 @@ export function Landing({ animate = true }: { animate?: boolean }) {
               <dd>
                 <strong>323 of 329</strong> and <strong>323 of 330</strong>. Two of 102 fixes that should have passed
                 were blocked. Precision counts each rule on each fix: all six wrong stops were V07, two of them on those
-                fixes and four on fixes another rule stopped anyway; all seven misses were V06.
+                fixes and four on fixes that had a different defect; all seven misses were V06.
               </dd>
             </div>
             <div>
