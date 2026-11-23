@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 from datetime import timedelta
-from pathlib import Path
 
 import psycopg
 import pytest
@@ -715,7 +714,9 @@ class TestOperations:
             conn.execute("CREATE DATABASE gatekeeper_migration_check")
         migrate(scratch)
         with psycopg.connect(scratch, autocommit=True) as conn:
-            conn.execute(Path(MIGRATIONS / "0001_init.down.sql").read_text(encoding="utf-8").encode())
+            # Every down migration, newest first, as a rollback of the whole schema would run them.
+            for down in sorted(MIGRATIONS.glob("*.down.sql"), reverse=True):
+                conn.execute(down.read_text(encoding="utf-8").encode())
             conn.execute("DROP TABLE schema_migrations")
             leftover = conn.execute(
                 "SELECT count(*) FROM pg_tables WHERE schemaname IN ('public','fixture')"

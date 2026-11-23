@@ -10,9 +10,23 @@ export type ProductOut = components["schemas"]["ProductOut"];
 export type AuditEntry = components["schemas"]["AuditEntry"];
 export type Whoami = components["schemas"]["Whoami"];
 export type Ops = components["schemas"]["Ops"];
+export type ShopifySession = components["schemas"]["ShopifySession"];
 
 const TOKEN_KEY = "gatekeeper.token";
+// The API sends this on a 401 when a fresh session token may succeed.
+const RETRY_SESSION_HEADER = "X-Shopify-Retry-Invalid-Session-Request";
 let memoryToken: string | null = null;
+
+/** Inside the Shopify admin, App Bridge is loaded and supplies session tokens. Nothing is stored in the browser. */
+export function isEmbedded(): boolean {
+  return typeof window !== "undefined" && typeof window.shopify?.idToken === "function";
+}
+
+async function authorization(): Promise<string | null> {
+  if (isEmbedded()) return `Bearer ${await window.shopify!.idToken()}`;
+  const token = getToken();
+  return token ? `Bearer ${token}` : null;
+}
 
 export function getToken(): string | null {
   if (memoryToken) return memoryToken;
@@ -42,15 +56,19 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = getToken();
+async function request<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
+  const auth = await authorization();
   const response = await fetch(path, {
     ...init,
     headers: {
       ...(init.body ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(auth ? { Authorization: auth } : {}),
     },
   });
+  // A session token lives a minute, and Shopify may refuse one that is about to expire. One retry with a new one.
+  if (response.status === 401 && !retried && isEmbedded() && response.headers.get(RETRY_SESSION_HEADER) === "1") {
+    return request<T>(path, init, true);
+  }
   if (!response.ok) {
     let detail = `Request failed with status ${response.status}.`;
     try {
@@ -81,6 +99,9 @@ export const api = {
   auditLog: () => request<AuditEntry[]>("/api/audit-log"),
   runAgent: (limit: number) =>
     request<{ queued: number }>("/api/admin/runs", { method: "POST", body: JSON.stringify({ limit }) }),
+  connect: () => request<ShopifySession>("/api/shopify/session", { method: "POST" }),
+  setWriteback: (enabled: boolean) =>
+    request("/api/admin/writeback", { method: "POST", body: JSON.stringify({ enabled }) }),
   simulateEdit: (productId: number) =>
     request("/demo/simulate-edit", { method: "POST", body: JSON.stringify({ product_id: productId }) }),
 };

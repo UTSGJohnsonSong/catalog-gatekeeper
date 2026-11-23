@@ -39,6 +39,8 @@ RESET_TABLES = (
     "findings",
     "products",
     "fixture.products",
+    # Always empty in a demo, which runs on the fixture store; check_demo_database refuses one that holds a token.
+    "shop_credentials",
 )
 # Kept, so a running API and worker never lose their footing: schema state, the shop row, the heartbeat, the allowed
 # proposal transitions the status trigger reads, and the policies.
@@ -88,6 +90,8 @@ def check_demo_database(conn: psycopg.Connection[Any], settings: Settings) -> No
         raise NotTheDemoDatabase(f"this database also serves {foreign[0]}; refusing to use it for the demo")
     if conn.execute("SELECT 1 FROM agent_runs WHERE mode = 'live' LIMIT 1").fetchone():
         raise NotTheDemoDatabase("this database holds runs of a real model; refusing to use it for the demo")
+    if "shop_credentials" in tables and conn.execute("SELECT 1 FROM shop_credentials LIMIT 1").fetchone():
+        raise NotTheDemoDatabase("this database holds a real store's token; refusing to use it for the demo")
     # Independent of configuration: every product of the demo comes from its own fixture store.
     if "fixture.products" not in tables:
         stranger = conn.execute("SELECT 1 FROM products LIMIT 1").fetchone()

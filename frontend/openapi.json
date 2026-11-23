@@ -243,6 +243,11 @@
       ],
       "title": "Demo Token"
      },
+     "embedded": {
+      "default": false,
+      "title": "Embedded",
+      "type": "boolean"
+     },
      "judge": {
       "title": "Judge",
       "type": "string"
@@ -726,6 +731,24 @@
      }
     },
     "title": "RunRequest",
+    "type": "object"
+   },
+   "ShopifySession": {
+    "properties": {
+     "first_connection": {
+      "title": "First Connection",
+      "type": "boolean"
+     },
+     "shop_domain": {
+      "title": "Shop Domain",
+      "type": "string"
+     }
+    },
+    "required": [
+     "shop_domain",
+     "first_connection"
+    ],
+    "title": "ShopifySession",
     "type": "object"
    },
    "SimulateEditRequest": {
@@ -1383,6 +1406,33 @@
     "summary": "Queue",
     "tags": [
      "review"
+    ]
+   }
+  },
+  "/api/shopify/session": {
+   "post": {
+    "description": "Called by the review app when it opens in the admin. Connects the store the first time.",
+    "operationId": "shopify_session_api_shopify_session_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ShopifySession"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Shopify Session",
+    "tags": [
+     "shopify"
     ]
    }
   },

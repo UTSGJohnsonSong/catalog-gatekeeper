@@ -1,18 +1,28 @@
-"""Bearer reviewer tokens. No cookies, so there is no CSRF surface. Only SHA-256 hashes are configured."""
+"""Bearer tokens. No cookies, so there is no CSRF surface.
+
+Two kinds: reviewer tokens, of which only SHA-256 hashes are configured, and, in embedded mode, the App Bridge
+session token that Shopify gives the review app inside the admin. Staff of the one store the deployment serves act
+as admins of it."""
 
 from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 from dataclasses import dataclass
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from gatekeeper.config import Settings
+from gatekeeper.shopify import session_token
+from gatekeeper.shopify.session_token import SessionToken
 
+log = logging.getLogger("gatekeeper.api")
 _bearer = HTTPBearer(auto_error=False)
 DEMO_TOKENS = {"demo-reviewer": ("demo_reviewer", "reviewer"), "demo-admin": ("demo_admin", "admin")}
+# App Bridge fetches a new session token and retries once when a 401 carries this header.
+RETRY_SESSION_HEADER = "X-Shopify-Retry-Invalid-Session-Request"
 
 
 @dataclass(frozen=True)
@@ -55,6 +65,41 @@ def demo_token(settings: Settings) -> str | None:
     return None
 
 
+def session_rejected(detail: str = "Session token missing or invalid") -> HTTPException:
+    return HTTPException(
+        status.HTTP_401_UNAUTHORIZED, detail, {"WWW-Authenticate": "Bearer", RETRY_SESSION_HEADER: "1"}
+    )
+
+
+def _verify_session(settings: Settings, raw: str) -> SessionToken:
+    if not (settings.shopify_client_id and settings.shopify_client_secret):
+        raise session_rejected()  # Unreachable with a valid config: embedded mode requires both.
+    try:
+        return session_token.verify(
+            raw,
+            client_id=settings.shopify_client_id,
+            client_secret=settings.shopify_client_secret.get_secret_value(),
+            shop_domain=settings.shopify_shop_domain,
+        )
+    except session_token.InvalidSessionToken as exc:
+        log.info("session token rejected: %s", exc)
+        raise session_rejected() from exc
+
+
+def current_session(
+    request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(_bearer)
+) -> SessionToken:
+    """Only a session token, for the call that connects the store."""
+    settings: Settings = request.app.state.settings
+    if not settings.shopify_embedded:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "This deployment does not run inside the Shopify admin")
+    if credentials is None:
+        raise session_rejected()
+    if not session_token.looks_like_session_token(credentials.credentials):
+        raise session_rejected()
+    return _verify_session(settings, credentials.credentials)
+
+
 def current_principal(
     request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(_bearer)
 ) -> Principal:
@@ -63,6 +108,10 @@ def current_principal(
     )
     if credentials is None:
         raise unauthorized
+    settings: Settings = request.app.state.settings
+    if settings.shopify_embedded and session_token.looks_like_session_token(credentials.credentials):
+        session = _verify_session(settings, credentials.credentials)
+        return Principal(f"shopify:{session.user_id}", "admin")
     presented = _sha256(credentials.credentials)
     match = None
     for stored, name, role in request.app.state.tokens:

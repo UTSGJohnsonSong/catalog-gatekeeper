@@ -21,6 +21,14 @@ class Meta(BaseModel):
     judge: str
     writeback_env_enabled: bool
     writeback_shop_enabled: bool
+    # True when the review app runs inside the Shopify admin and signs in with session tokens.
+    embedded: bool = False
+
+
+class ShopifySession(BaseModel):
+    shop_domain: str
+    # True when this call stored the store's first token and queued the first sync.
+    first_connection: bool
 
 
 class Whoami(BaseModel):

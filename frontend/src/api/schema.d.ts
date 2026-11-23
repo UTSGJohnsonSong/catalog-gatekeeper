@@ -191,6 +191,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/shopify/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Shopify Session
+         * @description Called by the review app when it opens in the admin. Connects the store the first time.
+         */
+        post: operations["shopify_session_api_shopify_session_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/whoami": {
         parameters: {
             query?: never;
@@ -380,6 +400,11 @@ export interface components {
             demo_reset_minutes: number;
             /** Demo Token */
             demo_token: string | null;
+            /**
+             * Embedded
+             * @default false
+             */
+            embedded: boolean;
             /** Judge */
             judge: string;
             /** Model */
@@ -541,6 +566,13 @@ export interface components {
             limit: number;
             /** Product Id */
             product_id?: number | null;
+        };
+        /** ShopifySession */
+        ShopifySession: {
+            /** First Connection */
+            first_connection: boolean;
+            /** Shop Domain */
+            shop_domain: string;
         };
         /** SimulateEditRequest */
         SimulateEditRequest: {
@@ -926,6 +958,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    shopify_session_api_shopify_session_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShopifySession"];
                 };
             };
         };

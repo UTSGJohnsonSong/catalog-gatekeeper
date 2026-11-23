@@ -12,14 +12,22 @@ from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from psycopg import errors as pg_errors
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from gatekeeper import jobs
 from gatekeeper.api import schemas
-from gatekeeper.api.auth import Principal, current_principal, demo_token, load_tokens, require_admin
+from gatekeeper.api.auth import (
+    Principal,
+    current_principal,
+    current_session,
+    demo_token,
+    load_tokens,
+    require_admin,
+    session_rejected,
+)
 from gatekeeper.api.limits import (
     LOOPBACK,
     SAFE_METHODS,
@@ -36,10 +44,13 @@ from gatekeeper.domain.product import ALLOWED_FIELDS
 from gatekeeper.migrate import latest_version
 from gatekeeper.rules.spec import AUDIT_RULES, VALIDATORS
 from gatekeeper.services import review as review_service
+from gatekeeper.services import shop_lifecycle
 from gatekeeper.services import webhooks as webhook_service
 from gatekeeper.services.writeback import set_kill_switch
 from gatekeeper.shopify import webhook_hmac
 from gatekeeper.shopify.fixture import FixtureShopify
+from gatekeeper.shopify.offline_tokens import SessionTokenRejected
+from gatekeeper.shopify.session_token import SessionToken
 from gatekeeper.worker import configure_logging
 
 log = logging.getLogger("gatekeeper.api")
@@ -53,13 +64,36 @@ ADDRESS_CHECKS_LOGGED = 5
 # text only. No inline script is allowed anywhere. The landing page and the API stay same-origin.
 POLARIS_CODE = "https://cdn.shopify.com/shopifycloud/"
 POLARIS_FONTS = "https://cdn.shopify.com/static/fonts/"
+APP_BRIDGE_SCRIPT = "https://cdn.shopify.com/shopifycloud/app-bridge.js"
 _CSP_TAIL = "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 SAME_ORIGIN_CSP = f"default-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; {_CSP_TAIL}"
-REVIEW_APP_CSP = (
-    f"default-src 'self'; script-src 'self' {POLARIS_CODE}; style-src 'self' {POLARIS_FONTS} 'unsafe-inline'; "
-    f"font-src 'self' {POLARIS_FONTS}; img-src 'self' data: {POLARIS_CODE}; connect-src 'self' {POLARIS_CODE}; "
-    f"{_CSP_TAIL}"
-)
+
+
+def review_app_csp(frame_ancestors: str = "'none'") -> str:
+    """Embedded, the review app may be framed by the one store's admin only. Shopify's review rejects a missing or
+    wildcard frame-ancestors, so the store is named exactly."""
+    return (
+        f"default-src 'self'; script-src 'self' {POLARIS_CODE}; style-src 'self' {POLARIS_FONTS} 'unsafe-inline'; "
+        f"font-src 'self' {POLARIS_FONTS}; img-src 'self' data: {POLARIS_CODE}; connect-src 'self' {POLARIS_CODE}; "
+        f"frame-ancestors {frame_ancestors}; base-uri 'none'; form-action 'self'"
+    )
+
+
+REVIEW_APP_CSP = review_app_csp()
+
+
+def embedded_frame_ancestors(shop_domain: str) -> str:
+    return f"https://{shop_domain} https://admin.shopify.com"
+
+
+def embedded_review_html(html: str, client_id: str) -> str:
+    """Adds App Bridge to the built review page. It must be the first script that blocks parsing, ahead of Polaris;
+    the bundle is a module script, which may come before it. The client ID was checked to be letters and digits."""
+    marker = "<head>"
+    if marker not in html:
+        raise ValueError("the review app's index.html has no <head>")
+    tags = f'<meta name="shopify-api-key" content="{client_id}" /><script src="{APP_BRIDGE_SCRIPT}"></script>'
+    return html.replace(marker, marker + tags, 1)
 
 
 def is_review_app_path(path: str) -> bool:
@@ -159,18 +193,24 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
                     return too_many(overall, "The demo is busy.")
             return cast(Response, await call_next(request))
 
+    embedded = settings.shopify_embedded
+    embedded_csp = review_app_csp(embedded_frame_ancestors(settings.shopify_shop_domain)) if embedded else None
+
     @app.middleware("http")
     async def security_headers(request: Request, call_next: Any) -> Response:
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["X-Frame-Options"] = "DENY"
+        review_page = is_review_app_path(request.url.path)
+        if embedded_csp and review_page:
+            # The admin frames these pages. X-Frame-Options has no way to name it, so frame-ancestors alone decides.
+            response.headers["Content-Security-Policy"] = embedded_csp
+        else:
+            response.headers["X-Frame-Options"] = "DENY"
+            response.headers["Content-Security-Policy"] = REVIEW_APP_CSP if review_page else SAME_ORIGIN_CSP
         # A public demo is only reachable through the host's HTTPS proxy.
         if in_production or settings.public_demo:
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
-        response.headers["Content-Security-Policy"] = (
-            REVIEW_APP_CSP if is_review_app_path(request.url.path) else SAME_ORIGIN_CSP
-        )
         return response
 
     # Health ---------------------------------------------------------------------------------------
@@ -221,7 +261,21 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
             judge="enabled" if ctx_.judge else "disabled",
             writeback_env_enabled=settings.writeback_enabled,
             writeback_shop_enabled=shop["writeback_enabled"],
+            embedded=settings.shopify_embedded,
         )
+
+    # Registered in every mode, so the API contract is complete; outside embedded mode it answers 404.
+    @app.post("/api/shopify/session", response_model=schemas.ShopifySession, tags=["shopify"])
+    def shopify_session(request: Request, session: SessionToken = Depends(current_session)) -> schemas.ShopifySession:
+        """Called by the review app when it opens in the admin. Connects the store the first time."""
+        ctx_ = _ctx(request)
+        try:
+            connected = shop_lifecycle.connect_store(ctx_, session)
+        except SessionTokenRejected as exc:
+            raise session_rejected("Shopify rejected the session token; App Bridge retries with a new one") from exc
+        if connected:
+            jobs.enqueue(ctx_.pool, "sync", {})
+        return schemas.ShopifySession(shop_domain=session.shop_domain, first_connection=connected)
 
     @app.get("/api/whoami", response_model=schemas.Whoami, tags=["meta"])
     def whoami(principal: Principal = Depends(current_principal)) -> schemas.Whoami:
@@ -408,7 +462,7 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
     # Webhook --------------------------------------------------------------------------------------
     @app.post("/webhooks/shopify", tags=["webhooks"])
     async def webhook(request: Request) -> JSONResponse:
-        secret = settings.shopify_webhook_secret
+        secret = settings.webhook_signing_secret
         if secret is None:
             return JSONResponse({"error": "webhook secret not configured"}, status_code=503)
         # Counted while reading, because a chunked request declares no length and must not fill memory unsigned.
@@ -495,13 +549,23 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
     if static and Path(static).is_dir():
         app.mount("/assets", StaticFiles(directory=Path(static) / "assets"), name="assets")
 
+        review_page = Path(static) / "app" / "index.html"
+        # Built once at boot: embedded, the review page carries App Bridge and the app's client ID.
+        embedded_page = (
+            embedded_review_html(review_page.read_text(encoding="utf-8"), settings.shopify_client_id or "")
+            if settings.shopify_embedded and review_page.is_file()
+            else None
+        )
+
         @app.get("/{path:path}", include_in_schema=False)
-        def spa(path: str) -> FileResponse:
+        def spa(path: str) -> Response:
             if path.startswith(("api/", "webhooks/", "demo/")):
                 raise HTTPException(404)
             # Two pages: the review app owns /app and everything under it, the landing page answers the rest.
             if is_review_app_path(f"/{path}"):
-                return FileResponse(Path(static) / "app" / "index.html")
+                if embedded_page is not None:
+                    return HTMLResponse(embedded_page)
+                return FileResponse(review_page)
             return FileResponse(Path(static) / "index.html")
 
     return app

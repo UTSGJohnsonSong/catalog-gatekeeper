@@ -6,9 +6,9 @@ write-back service does refetch, compare, write, read back. The residual race is
 Only the first 25 variants and 10 media of a product are read, to stay under the query cost limit. A change beyond
 those does not change the content hash, and defects there are not found. See docs/adr/0006.
 
-Tokens: either one token set by hand, or the client credentials grant, which Shopify answers with a token that lasts
-24 hours and no refresh token. Asking again is the refresh, so `ClientCredentialsToken` asks shortly before expiry
-and once more after a 401.
+Tokens: one token set by hand; or the client credentials grant, which Shopify answers with a token that lasts 24
+hours and no refresh token, so `ClientCredentialsToken` asks again shortly before expiry and once more after a 401;
+or, for the embedded app, the expiring offline token kept in the database (`offline_tokens.StoredOfflineToken`).
 """
 
 from __future__ import annotations
@@ -55,6 +55,8 @@ MUTATION_UPDATE = (
     "mutation ProductUpdate($product: ProductUpdateInput!) {"
     " productUpdate(product: $product) { product {" + _PRODUCT_FIELDS + "} userErrors { field message } } }"
 )
+# ShopPlan.partnerDevelopment: "Whether the shop is a partner development shop for testing purposes."
+QUERY_SHOP_PLAN = "query ShopPlan { shop { plan { partnerDevelopment } } }"
 # Shopify documents expires_in as 86399 for this grant. A shorter real lifetime still ends in a 401 and a refresh.
 DEFAULT_TOKEN_SECONDS = 86_399
 REFRESH_MARGIN_SECONDS = 300.0
@@ -197,6 +199,7 @@ class LiveShopify:
         access_token: str | None = None,
         token_source: TokenSource | None = None,
         writes_enabled: bool = False,
+        development_store_only: bool = False,
         transport: httpx.BaseTransport | None = None,
         sleep: Callable[[float], None] = time.sleep,
     ):
@@ -204,6 +207,9 @@ class LiveShopify:
             raise ValueError("pass exactly one of access_token and token_source")
         self._tokens: TokenSource = token_source or StaticToken(access_token or "")
         self._writes_enabled = writes_enabled
+        # Set when the template model drafts the fixes: such text may only reach a store Shopify calls a dev store.
+        self._development_store_only = development_store_only
+        self._is_development_store: bool | None = None
         self._sleep = sleep
         self._client = httpx.Client(
             base_url=f"https://{shop_domain}/admin/api/{api_version}",
@@ -278,6 +284,13 @@ class LiveShopify:
             return
         self._sleep((requested - available) / rate + random.uniform(0, 0.25))  # noqa: S311 - jitter, not security
 
+    def _development_store(self) -> bool:
+        """Asked once per process. A store does not turn into a development store, and only `true` counts."""
+        if self._is_development_store is None:
+            plan = (self._post("ShopPlan", QUERY_SHOP_PLAN, {}).get("shop") or {}).get("plan") or {}
+            self._is_development_store = plan.get("partnerDevelopment") is True
+        return self._is_development_store
+
     def list_products(
         self, *, cursor: str | None = None, first: int = 50, updated_since: datetime | None = None
     ) -> ProductPage:
@@ -299,6 +312,8 @@ class LiveShopify:
     ) -> UpdateResult:
         if not self._writes_enabled:
             raise ShopifyAuthError("live writes are disabled (WRITEBACK_ENABLED is false)")
+        if self._development_store_only and not self._development_store():
+            raise ShopifyAuthError("template-drafted fixes are written only to development stores, and this is not one")
         data = self._post("ProductUpdate", MUTATION_UPDATE, {"product": update_input(gid, dict(fields))})
         payload = data.get("productUpdate") or {}
         errors = [

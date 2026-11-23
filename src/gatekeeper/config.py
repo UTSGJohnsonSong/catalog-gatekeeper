@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import re
 from functools import lru_cache
 from pathlib import Path
@@ -13,6 +15,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ADMIN_API_VERSION = "2026-10"
 MYSHOPIFY_DOMAIN = re.compile(r"[a-z0-9][a-z0-9-]*\.myshopify\.com")
+# The client ID is written into the review app's HTML for App Bridge, so only plain characters are accepted.
+CLIENT_ID_FORMAT = re.compile(r"[A-Za-z0-9]{16,64}")
 
 
 class Settings(BaseSettings):
@@ -46,6 +50,13 @@ class Settings(BaseSettings):
     shopify_api_version: str = ADMIN_API_VERSION
     shopify_webhook_secret: SecretStr | None = None
     writeback_enabled: bool = False
+    # Embedded mode: the review app opens inside the Shopify admin of one store. Merchants sign in with App Bridge
+    # session tokens, and the store's expiring offline token is kept in the database, encrypted. See docs/adr/0011.
+    shopify_embedded: bool = False
+    # 32 random bytes, base64. Losing the key costs nothing worse than the merchant opening the app once to reconnect.
+    token_encryption_key: SecretStr | None = Field(default=None, repr=False)
+    # Lets the template model write, but only to a development store, which the adapter asks Shopify about first.
+    allow_template_writes_to_dev_store: bool = False
 
     llm_provider: Literal["auto", "anthropic", "heuristic"] = "auto"
     anthropic_api_key: SecretStr | None = None
@@ -71,6 +82,16 @@ class Settings(BaseSettings):
     app_db_password: SecretStr | None = None
     worker_poll_seconds: float = 1.0
 
+    @property
+    def uses_template_model(self) -> bool:
+        # "auto" without a key also resolves to the template model (context.build_provider).
+        return self.llm_provider == "heuristic" or (self.llm_provider == "auto" and not self.anthropic_api_key)
+
+    @property
+    def webhook_signing_secret(self) -> SecretStr | None:
+        """Webhooks declared in the app's configuration are signed with the app's client secret."""
+        return self.shopify_client_secret if self.shopify_embedded else self.shopify_webhook_secret
+
     @model_validator(mode="after")
     def _refuse_unsafe_production(self) -> Settings:
         problems: list[str] = []
@@ -79,12 +100,17 @@ class Settings(BaseSettings):
             problems.append("DEMO_MODE cannot be combined with the live Shopify adapter")
         if self.shopify_adapter == "live" and "shopify_shop_domain" not in self.model_fields_set:
             problems.append("SHOPIFY_SHOP_DOMAIN must be set explicitly with the live adapter")
-        # "auto" without a key also resolves to the template model (context.build_provider).
-        template_model = self.llm_provider == "heuristic" or (
-            self.llm_provider == "auto" and not self.anthropic_api_key
-        )
-        if self.shopify_adapter == "live" and self.writeback_enabled and template_model:
+        if (
+            self.shopify_adapter == "live"
+            and self.writeback_enabled
+            and self.uses_template_model
+            and not self.allow_template_writes_to_dev_store
+        ):
             problems.append("the template model cannot write to a live store")
+        if self.allow_template_writes_to_dev_store and self.shopify_adapter != "live":
+            problems.append("ALLOW_TEMPLATE_WRITES_TO_DEV_STORE only applies to the live adapter")
+        if self.shopify_embedded:
+            problems.extend(self._embedded_problems())
         if bool(self.shopify_client_id) != bool(self.shopify_client_secret):
             problems.append("SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET must be set together")
         if self.shopify_client_id and self.shopify_access_token:
@@ -121,9 +147,13 @@ class Settings(BaseSettings):
             problems.append("production requires SHOPIFY_ADAPTER=live; the fixture store is for demos and tests")
         if self.demo_mode:
             problems.append("DEMO_MODE must be off in production")
-        if not self.reviewer_tokens or not self.reviewer_tokens.get_secret_value().strip():
+        # An embedded app signs merchants in with session tokens; reviewer tokens stay optional, for staff.
+        if not self.shopify_embedded and (
+            not self.reviewer_tokens or not self.reviewer_tokens.get_secret_value().strip()
+        ):
             problems.append("REVIEWER_TOKENS is required in production")
-        if not self.shopify_webhook_secret or not self.shopify_webhook_secret.get_secret_value().strip():
+        signing = self.webhook_signing_secret
+        if not signing or not signing.get_secret_value().strip():
             problems.append("SHOPIFY_WEBHOOK_SECRET is required in production")
         if self.llm_provider == "auto":
             problems.append("LLM_PROVIDER must be explicit in production")
@@ -138,6 +168,42 @@ class Settings(BaseSettings):
         if problems:
             raise ValueError("; ".join(problems))
         return self
+
+    def _embedded_problems(self) -> list[str]:
+        problems: list[str] = []
+        if self.shopify_adapter != "live":
+            problems.append("SHOPIFY_EMBEDDED needs SHOPIFY_ADAPTER=live")
+        if self.public_demo:
+            problems.append("SHOPIFY_EMBEDDED cannot run as the public demo")
+        if not (self.shopify_client_id and self.shopify_client_secret):
+            problems.append("SHOPIFY_EMBEDDED needs SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET")
+        elif not CLIENT_ID_FORMAT.fullmatch(self.shopify_client_id):
+            problems.append("SHOPIFY_CLIENT_ID must be 16 to 64 letters and digits")
+        if self.shopify_access_token:
+            problems.append("SHOPIFY_EMBEDDED gets its store token by token exchange; unset SHOPIFY_ACCESS_TOKEN")
+        if self.shopify_webhook_secret:
+            # Two secrets would let product webhooks pass while the mandatory privacy webhooks fail, or the reverse.
+            problems.append("SHOPIFY_EMBEDDED signs webhooks with the client secret; unset SHOPIFY_WEBHOOK_SECRET")
+        key = self.token_encryption_key.get_secret_value() if self.token_encryption_key else ""
+        if not key.strip():
+            problems.append("SHOPIFY_EMBEDDED needs TOKEN_ENCRYPTION_KEY")
+        else:
+            try:
+                decode_key(key)
+            except ValueError as exc:
+                problems.append(str(exc))
+        return problems
+
+
+def decode_key(value: str) -> bytes:
+    """TOKEN_ENCRYPTION_KEY holds 32 random bytes in standard base64."""
+    try:
+        key = base64.b64decode(value.strip(), validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("TOKEN_ENCRYPTION_KEY must be standard base64") from exc
+    if len(key) != 32:
+        raise ValueError("TOKEN_ENCRYPTION_KEY must decode to exactly 32 bytes")
+    return key
 
 
 @lru_cache

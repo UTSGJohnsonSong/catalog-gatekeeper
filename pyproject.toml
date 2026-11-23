@@ -18,6 +18,10 @@ dependencies = [
   "pydantic-settings==2.16.2",
   "httpx==0.28.1",
   "pyyaml>=6,<7",
+  # Embedded app: session token checks and encryption of the stored store token. Both were already installed as
+  # dependencies of other packages; they are named here because the app now imports them itself.
+  "pyjwt==2.15.1",
+  "cryptography==50.0.2",
 ]
 
 [project.optional-dependencies]

@@ -13,6 +13,7 @@ from psycopg.types.json import Jsonb
 from gatekeeper.context import AppContext
 from gatekeeper.db import tx
 from gatekeeper.domain.product import content_hash
+from gatekeeper.services import shop_lifecycle
 from gatekeeper.services.catalog import (
     active_title_counts,
     mark_deleted,
@@ -22,7 +23,11 @@ from gatekeeper.services.catalog import (
 )
 
 log = logging.getLogger("gatekeeper.webhooks")
-HANDLED_TOPICS = {"products/update", "products/create", "products/delete"}
+PRODUCT_TOPICS = {"products/update", "products/create", "products/delete"}
+# The three privacy webhooks every App Store app must answer, and the uninstall notice.
+CUSTOMER_TOPICS = {"customers/data_request", "customers/redact"}
+LIFECYCLE_TOPICS = {"app/uninstalled", "shop/redact"} | CUSTOMER_TOPICS
+HANDLED_TOPICS = PRODUCT_TOPICS | LIFECYCLE_TOPICS
 ACTOR = "webhook"
 
 
@@ -47,10 +52,15 @@ def record_event(
     triggered_at: str | None,
 ) -> str:
     """The whole synchronous path: one insert and one enqueue, which fits Shopify's 5 second limit."""
-    try:
-        payload = json.loads(raw_body)
-    except ValueError:
-        payload = {"unparseable": True}
+    if topic in LIFECYCLE_TOPICS:
+        # Not kept: customer requests name the customer, and the uninstall notice carries the merchant's contact
+        # details. The topic alone says what to do.
+        payload: Any = {"not_stored": True}
+    else:
+        try:
+            payload = json.loads(raw_body)
+        except ValueError:
+            payload = {"unparseable": True}
     status = "received" if topic in HANDLED_TOPICS else "ignored"
     with tx(pool, ACTOR) as conn:
         row = conn.execute(
@@ -86,6 +96,11 @@ def process_event(ctx: AppContext, event_row_id: int) -> str:
         event = conn.execute("SELECT topic, payload FROM webhook_events WHERE id = %s", (event_row_id,)).fetchone()
     if event is None:
         raise KeyError(event_row_id)
+    if event["topic"] in LIFECYCLE_TOPICS:
+        _handle_lifecycle(ctx, event["topic"])
+        # shop/redact deletes this row with the rest of the store's events, so the update may match nothing.
+        _mark(ctx, event_row_id, "processed", None)
+        return "processed"
     gid = _gid_from_payload(event["payload"])
     if gid is None:
         log.warning("signed webhook names no product", extra={"webhook_id": event_row_id})
@@ -109,7 +124,17 @@ def process_event(ctx: AppContext, event_row_id: int) -> str:
     return "processed"
 
 
-def _mark(ctx: AppContext, event_row_id: int, status: str, error: str) -> None:
+def _handle_lifecycle(ctx: AppContext, topic: str) -> None:
+    if topic == "app/uninstalled":
+        shop_lifecycle.mark_uninstalled(ctx)
+    elif topic == "shop/redact":
+        counts = shop_lifecycle.erase_shop_data(ctx)
+        log.info("store data erased after shop/redact: %s", counts)
+    else:
+        shop_lifecycle.acknowledge_customer_request(ctx, topic)
+
+
+def _mark(ctx: AppContext, event_row_id: int, status: str, error: str | None) -> None:
     with tx(ctx.pool, ACTOR) as conn:
         conn.execute(
             "UPDATE webhook_events SET status = %s, error = %s, processed_at = now() WHERE id = %s",
