@@ -42,7 +42,7 @@ export function Privacy() {
           </ul>
           <p>
             Someone who opens the app from the Shopify admin is identified by their Shopify user ID, which is a number.
-            The app keeps that ID with their decisions. It never receives their name or email address.
+            The app keeps that ID with their decisions, and does not store their name or email address.
           </p>
         </section>
 

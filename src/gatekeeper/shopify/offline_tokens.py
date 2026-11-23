@@ -1,11 +1,11 @@
 """Expiring offline tokens for the embedded app, kept in Postgres and encrypted. See docs/adr/0013.
 
 Managed installation installs the app without calling it. The first time a merchant opens the app, the frontend's
-session token is exchanged for an offline token. Offline tokens now expire after an hour and come with a refresh
-token that lasts 90 days; a refresh returns a new pair.
+session token is exchanged for an offline token. Requested with `expiring=1`, as this app always does, it lasts an
+hour and comes with a refresh token that lasts 90 days; a refresh returns a new pair.
 
-Shopify keeps one current token per app and store, and a new exchange or refresh retires the older ones. So exchange
-and refresh for a store never run at the same time: both hold a Postgres advisory lock for the store, which covers
+A new exchange or refresh retires every other refresh token for the app and store at once, while retired access
+tokens work until they expire. So exchange and refresh for a store never run at the same time: both hold a Postgres advisory lock for the store, which covers
 the API and the worker processes alike, and both read the stored row again after taking it.
 
 https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens
@@ -250,14 +250,18 @@ def load_grant(conn: Conn, shop_id: int, shop_domain: str, cipher: TokenCipher) 
     return TokenGrant(access, row["scope"], row["access_expires_at"], refresh, row["refresh_expires_at"])
 
 
-def save_grant(conn: Conn, shop_id: int, shop_domain: str, cipher: TokenCipher, grant: TokenGrant) -> None:
+def save_grant(
+    conn: Conn, shop_id: int, shop_domain: str, cipher: TokenCipher, grant: TokenGrant, *, exchanged: bool = False
+) -> None:
+    """`exchanged` marks a token from a token exchange rather than a refresh, which moves `exchanged_at`."""
     conn.execute(
         "INSERT INTO shop_credentials "
         "(shop_id, access_token, access_expires_at, refresh_token, refresh_expires_at, scope, updated_at) "
         "VALUES (%s, %s, %s, %s, %s, %s, now()) ON CONFLICT (shop_id) DO UPDATE SET "
         "access_token = EXCLUDED.access_token, access_expires_at = EXCLUDED.access_expires_at, "
         "refresh_token = EXCLUDED.refresh_token, refresh_expires_at = EXCLUDED.refresh_expires_at, "
-        "scope = EXCLUDED.scope, updated_at = now()",
+        "scope = EXCLUDED.scope, updated_at = now(), "
+        "exchanged_at = CASE WHEN %s THEN now() ELSE shop_credentials.exchanged_at END",
         (
             shop_id,
             cipher.encrypt(grant.access_token, context=_context(shop_domain, "access")),
@@ -265,6 +269,7 @@ def save_grant(conn: Conn, shop_id: int, shop_domain: str, cipher: TokenCipher, 
             cipher.encrypt(grant.refresh_token, context=_context(shop_domain, "refresh")),
             grant.refresh_expires_at,
             grant.scope,
+            exchanged,
         ),
     )
 

@@ -53,12 +53,12 @@ def record_event(
 ) -> str:
     """The whole synchronous path: one insert and one enqueue, which fits Shopify's 5 second limit."""
     if topic in LIFECYCLE_TOPICS:
-        named = _store_named_in(raw_body)
-        if named != shop_domain.lower():
-            # These webhooks act on their topic, which sits outside the signature, so the signed body has to name
-            # this store. It matters because the client secret also signs session tokens: a session token's own
-            # signature is a valid webhook signature for the token's header and payload, which is not JSON.
-            log.warning("signed %s webhook ignored: its body does not name this store", topic)
+        if not _lifecycle_body_matches(topic, raw_body, shop_domain):
+            # These webhooks act on their topic, which sits outside the signature, so the signed body has to be the
+            # one this topic carries, naming this store. Two reasons: the client secret also signs session tokens,
+            # and a session token's own signature is a valid webhook signature for its header and payload, which is
+            # not JSON; and a genuine body of one topic must not be replayed under another.
+            log.warning("signed %s webhook ignored: its body is not one this topic carries for this store", topic)
             return "ignored"
         # Not kept: customer requests name the customer, and the uninstall notice carries the merchant's contact
         # details. The topic alone says what to do.
@@ -86,17 +86,28 @@ def record_event(
     return "accepted"
 
 
-def _store_named_in(raw_body: bytes) -> str | None:
-    """The store a lifecycle body names: `shop_domain` in the privacy webhooks, `myshopify_domain` in the shop object
-    that app/uninstalled carries. None when the body is not a JSON object or names no store."""
+# For each lifecycle topic, the keys its body must have and the keys it must not have, from the example payloads in
+# https://shopify.dev/docs/apps/build/compliance/privacy-law-compliance and the shop object app/uninstalled carries.
+_LIFECYCLE_SHAPES: dict[str, tuple[frozenset[str], frozenset[str]]] = {
+    "shop/redact": (frozenset({"shop_id", "shop_domain"}), frozenset({"customer"})),
+    "customers/redact": (frozenset({"shop_domain", "customer", "orders_to_redact"}), frozenset()),
+    "customers/data_request": (frozenset({"shop_domain", "customer", "orders_requested"}), frozenset()),
+    "app/uninstalled": (frozenset({"id", "myshopify_domain"}), frozenset({"shop_domain", "customer"})),
+}
+
+
+def _lifecycle_body_matches(topic: str, raw_body: bytes, shop_domain: str) -> bool:
     try:
         body = json.loads(raw_body)
     except ValueError:
-        return None
+        return False
     if not isinstance(body, dict):
-        return None
-    named = body.get("shop_domain", body.get("myshopify_domain"))
-    return named.lower() if isinstance(named, str) else None
+        return False
+    required, forbidden = _LIFECYCLE_SHAPES[topic]
+    if not required <= body.keys() or forbidden & body.keys():
+        return False
+    named = body.get("myshopify_domain" if topic == "app/uninstalled" else "shop_domain")
+    return isinstance(named, str) and named.lower() == shop_domain.lower()
 
 
 def _gid_from_payload(payload: Any) -> str | None:
@@ -113,11 +124,13 @@ def _gid_from_payload(payload: Any) -> str | None:
 
 def process_event(ctx: AppContext, event_row_id: int) -> str:
     with tx(ctx.pool, ACTOR) as conn:
-        event = conn.execute("SELECT topic, payload FROM webhook_events WHERE id = %s", (event_row_id,)).fetchone()
+        event = conn.execute(
+            "SELECT topic, payload, triggered_at FROM webhook_events WHERE id = %s", (event_row_id,)
+        ).fetchone()
     if event is None:
         raise KeyError(event_row_id)
     if event["topic"] in LIFECYCLE_TOPICS:
-        _handle_lifecycle(ctx, event["topic"])
+        _handle_lifecycle(ctx, event["topic"], event["triggered_at"])
         # shop/redact deletes this row with the rest of the store's events, so the update may match nothing.
         _mark(ctx, event_row_id, "processed", None)
         return "processed"
@@ -144,9 +157,9 @@ def process_event(ctx: AppContext, event_row_id: int) -> str:
     return "processed"
 
 
-def _handle_lifecycle(ctx: AppContext, topic: str) -> None:
+def _handle_lifecycle(ctx: AppContext, topic: str, triggered_at: datetime | None) -> None:
     if topic == "app/uninstalled":
-        shop_lifecycle.mark_uninstalled(ctx)
+        shop_lifecycle.mark_uninstalled(ctx, triggered_at=triggered_at)
     elif topic == "shop/redact":
         counts = shop_lifecycle.erase_shop_data(ctx)
         log.info("store data erased after shop/redact: %s", counts)

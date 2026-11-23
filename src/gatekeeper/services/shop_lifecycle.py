@@ -8,6 +8,9 @@ https://shopify.dev/docs/apps/build/compliance/privacy-law-compliance
 
 from __future__ import annotations
 
+import logging
+from datetime import datetime
+
 from psycopg import sql
 
 from gatekeeper.context import AppContext
@@ -25,6 +28,7 @@ from gatekeeper.shopify.offline_tokens import (
 from gatekeeper.shopify.session_token import SessionToken
 
 ACTOR = "shopify-lifecycle"
+log = logging.getLogger("gatekeeper.lifecycle")
 
 # Rows that hold the store's catalog or the work done on it, children before parents. The audit log keeps its rows:
 # the database refuses to change them, by trigger and by grant. They carry ids, statuses, counts and actor names,
@@ -53,7 +57,7 @@ def connect_store(ctx: AppContext, session: SessionToken) -> bool:
 
     Returns True when this call stored a new token, so the caller can queue a sync: on the first open, and on the
     first open after an uninstall, an expired or refused refresh token, or a new TOKEN_ENCRYPTION_KEY. Exchanging on
-    every open would retire the token the worker is using, so a stored token that can still be refreshed wins."""
+    every open would retire the refresh token the worker holds, so a stored token that can still be refreshed wins."""
     auth = _auth(ctx)
     # The configured store, which the token source reads with. verify() has checked that the session names it.
     domain = ctx.settings.shopify_shop_domain
@@ -66,7 +70,7 @@ def connect_store(ctx: AppContext, session: SessionToken) -> bool:
         if current is not None and current.refresh_usable(utc_now()):
             return False
         grant = auth.endpoint.exchange(session.raw)
-        save_grant(conn, ctx.shop_id, domain, auth.cipher, grant)
+        save_grant(conn, ctx.shop_id, domain, auth.cipher, grant, exchanged=True)
         conn.execute(
             "UPDATE shops SET installed_at = coalesce(installed_at, now()), uninstalled_at = NULL, redacted_at = NULL "
             "WHERE id = %s",
@@ -84,10 +88,21 @@ def connect_store(ctx: AppContext, session: SessionToken) -> bool:
     return True
 
 
-def mark_uninstalled(ctx: AppContext) -> None:
-    """Shopify has already revoked the tokens. Forget ours, stop writing, and drop work that would need the store."""
+def mark_uninstalled(ctx: AppContext, *, triggered_at: datetime | None = None) -> None:
+    """Shopify has already revoked the tokens. Forget ours, stop writing, and drop work that would need the store.
+
+    A notice that arrives after the merchant reinstalled, which a sleeping free host makes likely, is about the
+    earlier install: when it was triggered before the current token was exchanged, it changes nothing."""
     with tx(ctx.pool, ACTOR) as conn:
         lock_store_tokens(conn, ctx.shop_id)
+        if triggered_at is not None:
+            newer = conn.execute(
+                "SELECT 1 FROM shop_credentials WHERE shop_id = %s AND exchanged_at > %s", (ctx.shop_id, triggered_at)
+            ).fetchone()
+            if newer:
+                log.warning("app/uninstalled from %s ignored: the store reinstalled the app after it", triggered_at)
+                write_audit(conn, ACTOR, "shop.uninstall_ignored", "shop", str(ctx.shop_id), ctx.shop_id, {})
+                return
         removed = delete_grant(conn, ctx.shop_id)
         conn.execute("UPDATE shops SET uninstalled_at = now(), writeback_enabled = false WHERE id = %s", (ctx.shop_id,))
         dropped = conn.execute(

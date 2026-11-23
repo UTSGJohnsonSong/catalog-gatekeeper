@@ -89,7 +89,8 @@ class Settings(BaseSettings):
 
     @property
     def webhook_signing_secret(self) -> SecretStr | None:
-        """Webhooks declared in the app's configuration are signed with the app's client secret."""
+        """Webhooks declared in the app's configuration are signed with the app's client secret: during a rotation, the
+        oldest one not yet revoked."""
         return self.shopify_client_secret if self.shopify_embedded else self.shopify_webhook_secret
 
     @model_validator(mode="after")

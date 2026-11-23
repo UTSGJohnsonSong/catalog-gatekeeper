@@ -39,7 +39,8 @@ class SessionToken:
 
 
 def looks_like_session_token(value: str) -> bool:
-    """A JWT has three dot-separated parts; reviewer tokens never contain a dot."""
+    """A JWT has three dot-separated parts. In embedded mode a bearer token with exactly two dots is read as a
+    session token, so reviewer tokens should contain no dots."""
     return value.count(".") == 2
 
 

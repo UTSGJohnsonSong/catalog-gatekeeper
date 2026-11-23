@@ -56,12 +56,13 @@ export function SettingsPage() {
         <s-section heading="Your store's data">
           <s-stack gap="base">
             <s-paragraph>
-              The app reads products only: titles, descriptions, search text, variants and image alt text. It never
-              reads customers or orders.
+              The app reads products only: title, description, search title and description, tags, vendor, type,
+              status, the first 25 variants and the alt text of the first 10 images. It never reads customers or orders.
             </s-paragraph>
             <s-paragraph>
-              Uninstalling the app ends its access at once. Shopify then asks the app to erase your store&apos;s data,
-              and it deletes the products, findings and fixes it kept. The activity log keeps who decided what, and when.
+              Uninstalling the app ends its access at once. 48 hours later Shopify asks the app to erase your
+              store&apos;s data, and it deletes the products, findings and fixes it kept. The activity log keeps its
+              entries: IDs, statuses, Shopify user IDs, and any note typed when rejecting a fix.
             </s-paragraph>
             <s-link href="/privacy/" target="_blank">
               Privacy policy

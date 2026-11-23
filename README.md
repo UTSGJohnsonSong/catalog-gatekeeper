@@ -38,7 +38,7 @@ locally and not deployed yet.
 | Agent behaviour, cost, latency | **Measured once on 40 synthetic products** (see Results). Repair quality has no automatic score. The policy search and citation path was never used by the real model |
 | Free public demo (one container, Render and Neon) | **Rehearsed locally, not deployed.** `docker-compose.public.yml` with `scripts/smoke_public.py` passed on 2026-11-03 and again on 2026-11-04 with the Polaris UI and the landing page; output in `eval/reports/checks-2026-11-04/` |
 | Live Shopify adapter | **Written, not run.** Tested against a mocked GraphQL server only, token renewal included. It has never called a store |
-| Embedded mode: App Bridge session tokens, token exchange for expiring offline tokens, the privacy webhooks | **Written, not run in a store.** Tested against mocked Shopify HTTP and real Postgres, the refresh race between two processes included (`tests/integration/test_embedded_app.py`). Steps in `docs/EMBEDDED.md` |
+| Embedded mode: App Bridge session tokens, token exchange for expiring offline tokens, the privacy webhooks | **Written, not run in a store.** Tested against mocked Shopify HTTP and real Postgres (`tests/integration/test_embedded_app.py`), including the refresh race between the API and the worker, with two token sources on separate connections, and a webhook forged from a session token. Steps in `docs/EMBEDDED.md` |
 | Terraform for ECS and RDS | **Validated with `terraform validate`, never applied** |
 
 `docs/DEMO_HONESTY.md` has the detail, `docs/REVIEW_2026-10-31.md` lists what review found and what stayed unfixed.

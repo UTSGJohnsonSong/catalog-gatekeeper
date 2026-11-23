@@ -545,3 +545,22 @@ def test_a_refresh_refused_for_the_apps_own_credentials_is_not_a_dead_refresh_to
     with pytest.raises(ShopifyAuthError, match="SHOPIFY_CLIENT_SECRET") as caught:
         endpoint(lambda r: response).refresh("t")
     assert not isinstance(caught.value, RefreshRejected)
+
+
+def test_access_logs_keep_the_path_and_drop_the_query_string():
+    # The admin opens the app with a session token and an HMAC in the query string.
+    import logging
+
+    from gatekeeper.worker import DropQueryStrings
+
+    record = logging.LogRecord(
+        "uvicorn.access",
+        logging.INFO,
+        __file__,
+        1,
+        '%s - "%s %s HTTP/%s" %d',
+        ("10.0.0.1:5000", "GET", "/app/?embedded=1&id_token=a.b.c&hmac=abc", "1.1", 200),
+        None,
+    )
+    assert DropQueryStrings().filter(record)
+    assert "id_token" not in record.getMessage() and '"GET /app/ HTTP/1.1"' in record.getMessage()

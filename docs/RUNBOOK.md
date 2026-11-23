@@ -62,14 +62,14 @@ Logs are JSON on stdout, with `job_id`, `kind`, `proposal_id`, `run_id` where th
 
 **Bump the Admin API version (quarterly).** Change `ADMIN_API_VERSION` in `src/gatekeeper/config.py`, run the contract tests, then run a read-only sync against the dev store and save real responses as new fixtures before enabling writes.
 
-**Roll back a deploy.** ECS circuit breaker rolls back a failing deploy automatically. To roll back by hand, redeploy the previous image tag. Migrations here are additive, so old code keeps working against the new schema. The down files, run newest first, tear the whole schema down and drop its data; a test runs them and checks that no table is left.
+**Roll back a deploy.** ECS circuit breaker rolls back a failing deploy automatically. To roll back by hand, redeploy the previous image tag. Migrations here are additive, so old code keeps working against the new schema. The down files, run newest first, tear the whole schema down and drop its data; a test runs them and checks that no table is left. One exception: the public demo's boot check refuses tables it does not know, so a demo rolled back to before migration 0004 refuses its own database. Run `0004_embedded_app.down.sql` and delete the `0004` row from `schema_migrations` first; the table it drops is always empty in a demo.
 
 ### Embedded app (`docs/EMBEDDED.md`)
 
 **"the app is not connected to this store" in the logs.** No usable store token is stored: nobody has opened the app since install, the merchant uninstalled it, Shopify refused the refresh token, or `TOKEN_ENCRYPTION_KEY` changed. Scheduled syncs are skipped, not failed. Opening the app once from the store's admin exchanges a new token and queues a sync.
 
-**Rotate `TOKEN_ENCRYPTION_KEY`.** Set the new key and redeploy. The stored token no longer decrypts, which the log says once, and the next open reconnects the store. Nothing else is encrypted with it.
+**Rotate `TOKEN_ENCRYPTION_KEY`.** Set the new key and redeploy. The stored token no longer decrypts: until the next open reconnects the store, each sync logs that and fails, and the ops page counts the dead jobs. Nothing else is encrypted with it.
 
-**Rotate the client secret.** Rotate it in the Dev Dashboard, update `SHOPIFY_CLIENT_SECRET`, redeploy. It signs the webhooks and the session tokens and is sent in token requests, so all three fail until the service has the new one.
+**Rotate the client secret.** Generate a new secret in the Dev Dashboard; the old one stays active until you revoke it. Set `SHOPIFY_CLIENT_SECRET` to the new one, redeploy, let the next refresh renew the stored token, then revoke the old secret. Until then Shopify signs webhooks with the oldest secret still active, which this app no longer checks, so webhooks fail in between and the hourly sync covers product changes (shopify.dev, rotate and revoke client credentials). The docs do not say which secret signs session tokens during the overlap.
 
 **After an uninstall.** `app/uninstalled` deletes the token, pauses writing and drops queued syncs and runs. `shop/redact` follows 48 hours later and deletes the store's catalog and the work derived from it; the audit log keeps its rows. The two customer privacy webhooks are answered with a record that no customer data is held.

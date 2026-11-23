@@ -14,5 +14,8 @@ CREATE TABLE shop_credentials (
   refresh_token bytea NOT NULL,
   refresh_expires_at timestamptz NOT NULL,
   scope text NOT NULL DEFAULT '',
+  -- When this token came from a token exchange, which a reinstall also goes through; a refresh leaves it alone.
+  -- A late app/uninstalled from before this moment is about an earlier install.
+  exchanged_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );

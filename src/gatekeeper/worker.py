@@ -47,10 +47,24 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(data)
 
 
+class DropQueryStrings(logging.Filter):
+    """Uvicorn's access log prints each path with its query string. When the admin opens the app, that string carries
+    a session token and an HMAC made with the client secret, so only the path is logged."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple) and len(args) >= 3 and isinstance(args[2], str) and "?" in args[2]:
+            record.args = (*args[:2], args[2].split("?", 1)[0], *args[3:])
+        return True
+
+
 def configure_logging() -> None:
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JsonFormatter())
     logging.basicConfig(level=logging.INFO, handlers=[handler], force=True)
+    access = logging.getLogger("uvicorn.access")
+    if not any(isinstance(f, DropQueryStrings) for f in access.filters):
+        access.addFilter(DropQueryStrings())
 
 
 def run_job(ctx: AppContext, job: dict) -> None:

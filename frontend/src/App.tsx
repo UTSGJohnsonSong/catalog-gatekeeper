@@ -61,7 +61,7 @@ export function EmbeddedApp() {
             {session.data.connected_now && (
               <s-banner tone="info" heading="Reading your catalog">
                 The app is connected to your store and is reading your products. Findings appear on the Products page
-                within a minute, and no fix is drafted until you ask for one.
+                when the sync finishes, and no fix is drafted until you ask for one.
               </s-banner>
             )}
             <AppRoutes />

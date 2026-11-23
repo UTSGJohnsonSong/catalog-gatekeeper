@@ -65,7 +65,8 @@ async function request<T>(path: string, init: RequestInit = {}, retried = false)
       ...(auth ? { Authorization: auth } : {}),
     },
   });
-  // A session token lives a minute, and Shopify may refuse one that is about to expire. One retry with a new one.
+  // A session token lives a minute, and Shopify may refuse one that is about to expire. One retry with a new one;
+  // App Bridge's own fetch may also retry once on this header.
   if (response.status === 401 && !retried && isEmbedded() && response.headers.get(RETRY_SESSION_HEADER) === "1") {
     return request<T>(path, init, true);
   }

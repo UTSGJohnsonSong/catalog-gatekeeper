@@ -263,7 +263,9 @@ def eclient(ectx):
         yield client
 
 
-def send(client, topic: str, body: dict, *, secret: str = SECRET, webhook_id: str = "wh-1"):
+def send(
+    client, topic: str, body: dict, *, secret: str = SECRET, webhook_id: str = "wh-1", triggered_at: str | None = None
+):
     raw = json.dumps(body).encode()
     headers = {
         "X-Shopify-Hmac-Sha256": sign(secret, raw),
@@ -271,6 +273,8 @@ def send(client, topic: str, body: dict, *, secret: str = SECRET, webhook_id: st
         "X-Shopify-Topic": topic,
         "X-Shopify-Shop-Domain": SHOP,
     }
+    if triggered_at:
+        headers["X-Shopify-Triggered-At"] = triggered_at
     return client.post("/webhooks/shopify", content=raw, headers=headers)
 
 
@@ -279,16 +283,25 @@ def drain(ctx: AppContext) -> None:
         run_job(ctx, job)
 
 
-CUSTOMER_REQUEST = {
-    "shop_domain": SHOP,
-    "customer": {"id": 191167, "email": "john@example.com", "phone": "555-625-1199"},
-    "orders_requested": [299938],
+# Shaped like the examples on shopify.dev's privacy law compliance page, and the shop object for app/uninstalled.
+CUSTOMER = {"id": 191167, "email": "john@example.com", "phone": "555-625-1199"}
+BODIES = {
+    "customers/data_request": {
+        "shop_id": 954889,
+        "shop_domain": SHOP,
+        "orders_requested": [299938],
+        "customer": CUSTOMER,
+        "data_request": {"id": 9999},
+    },
+    "customers/redact": {"shop_id": 954889, "shop_domain": SHOP, "customer": CUSTOMER, "orders_to_redact": [299938]},
+    "shop/redact": {"shop_id": 954889, "shop_domain": SHOP},
+    "app/uninstalled": {"id": 954889, "myshopify_domain": SHOP, "domain": "shop.example.com", "email": "o@example.com"},
 }
 
 
 @pytest.mark.parametrize("topic", ["customers/data_request", "customers/redact"])
 def test_customer_privacy_webhooks_are_answered_without_storing_the_customer(ectx, eclient, topic):
-    assert send(eclient, topic, CUSTOMER_REQUEST).status_code == 200
+    assert send(eclient, topic, BODIES[topic]).status_code == 200
     drain(ectx)
     with ectx.pool.connection() as conn:
         event = conn.execute("SELECT payload, status FROM webhook_events").fetchone()
@@ -299,17 +312,16 @@ def test_customer_privacy_webhooks_are_answered_without_storing_the_customer(ect
 
 
 def test_privacy_webhooks_signed_with_another_secret_get_401(eclient):
-    assert send(eclient, "shop/redact", {"shop_domain": SHOP}, secret="not-the-client-secret").status_code == 401
+    assert send(eclient, "shop/redact", BODIES["shop/redact"], secret="not-the-client-secret").status_code == 401
 
 
 def test_uninstall_and_redact_webhooks_reach_the_store_lifecycle(ectx, eclient):
     seed_product(ectx)
     store_grant(ectx, access_in=timedelta(hours=1))
-    uninstalled = {"myshopify_domain": SHOP, "domain": "shop.example.com", "email": "owner@example.com"}
-    assert send(eclient, "app/uninstalled", uninstalled).status_code == 200
+    assert send(eclient, "app/uninstalled", BODIES["app/uninstalled"]).status_code == 200
     drain(ectx)
     assert stored(ectx) is None
-    assert send(eclient, "shop/redact", {"shop_domain": SHOP}, webhook_id="wh-2").status_code == 200
+    assert send(eclient, "shop/redact", BODIES["shop/redact"], webhook_id="wh-2").status_code == 200
     drain(ectx)
     with ectx.pool.connection() as conn:
         assert conn.execute("SELECT count(*) AS n FROM products").fetchone()["n"] == 0
@@ -414,7 +426,8 @@ def test_a_webhook_forged_from_a_session_token_changes_nothing(ectx, eclient, to
 
 def test_a_signed_lifecycle_webhook_that_names_another_store_changes_nothing(ectx, eclient):
     seed_product(ectx)
-    assert send(eclient, "shop/redact", {"shop_domain": "other-store.myshopify.com"}).json() == {"status": "ignored"}
+    other = {"shop_id": 1, "shop_domain": "other-store.myshopify.com"}
+    assert send(eclient, "shop/redact", other).json() == {"status": "ignored"}
     drain(ectx)
     with ectx.pool.connection() as conn:
         assert conn.execute("SELECT count(*) AS n FROM products").fetchone()["n"] == 1
@@ -569,3 +582,44 @@ def test_a_store_that_may_not_be_written_ends_the_fix_cleanly_before_anything_is
         ).fetchone()
     assert (row["status"], row["written"], row["attempts"]) == ("failed", "failed", 0)
     assert "writes_not_allowed" in row["user_errors"][0]["message"]
+
+
+@pytest.mark.parametrize(
+    ("body_of", "sent_as"),
+    [
+        ("customers/redact", "shop/redact"),
+        ("shop/redact", "app/uninstalled"),
+        ("app/uninstalled", "shop/redact"),
+    ],
+)
+def test_a_genuine_body_replayed_under_another_topic_changes_nothing(ectx, eclient, body_of, sent_as):
+    # The topic header is outside the signature, so only the body's shape can tell the topics apart.
+    seed_product(ectx)
+    store_grant(ectx, access_in=timedelta(hours=1))
+    assert send(eclient, sent_as, BODIES[body_of], webhook_id=f"replay-{body_of}").json() == {"status": "ignored"}
+    drain(ectx)
+    with ectx.pool.connection() as conn:
+        assert conn.execute("SELECT count(*) AS n FROM products").fetchone()["n"] == 1
+    assert stored(ectx) is not None
+
+
+def test_an_uninstall_notice_from_before_a_reinstall_changes_nothing(ectx, eclient, server):
+    assert shop_lifecycle.connect_store(ectx, session()) is True  # the reinstall: a token exchanged just now
+    an_hour_ago = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
+    assert send(eclient, "app/uninstalled", BODIES["app/uninstalled"], triggered_at=an_hour_ago).status_code == 200
+    drain(ectx)
+    assert stored(ectx) is not None
+    with ectx.pool.connection() as conn:
+        shop = conn.execute("SELECT uninstalled_at, writeback_enabled FROM shops WHERE id = %s", (ectx.shop_id,))
+        row = shop.fetchone()
+        ignored = conn.execute("SELECT count(*) AS n FROM audit_log WHERE action = 'shop.uninstall_ignored'")
+        assert ignored.fetchone()["n"] == 1
+    assert row["uninstalled_at"] is None and row["writeback_enabled"] is True
+
+
+def test_an_uninstall_notice_from_after_the_last_exchange_still_disconnects(ectx, eclient):
+    assert shop_lifecycle.connect_store(ectx, session()) is True
+    just_now = (datetime.now(UTC) + timedelta(seconds=5)).isoformat()
+    assert send(eclient, "app/uninstalled", BODIES["app/uninstalled"], triggered_at=just_now).status_code == 200
+    drain(ectx)
+    assert stored(ectx) is None
