@@ -94,9 +94,9 @@ export const HARD_LIMITS: { lead: string; detail: string }[] = [
       "An admin can switch it off at any time. Approved fixes then wait, and a fix that has not been sent yet goes back to approved. A write already on its way to the store is not called back.",
   },
   {
-    lead: "The template script cannot write to a live store.",
+    lead: "The template script cannot write to a merchant's store.",
     detail:
-      "Live writes need a model key. With the live adapter, write-back on and only the template script, the app refuses to start.",
+      "Live writes need a model key, with one exception: a development store, which the app confirms with Shopify before every write. With the live adapter, write-back on and only the template script, the app refuses to start unless that exception is switched on.",
   },
   {
     lead: "The app cannot rewrite its audit log.",
@@ -144,7 +144,7 @@ export const STATUS_DONE: string[] = [
   "The rules and the citation checker are measured on a frozen synthetic test split, with Wilson intervals.",
   "A hosted LLM has run the agent once, on 40 synthetic products.",
   "The MCP server has run over streamable HTTP.",
-  "Embedded mode: the review screen opens inside a store's Shopify admin, signs people in with Shopify's session tokens, exchanges them for expiring store tokens and answers the mandatory privacy webhooks. It is tested against a mocked Shopify server and a real Postgres database.",
+  "Embedded mode, built and tested: the review screen is built to open inside a store's Shopify admin, sign people in with Shopify's session tokens, exchange them for expiring store tokens and answer the mandatory privacy webhooks. It is tested against a mocked Shopify server and a real Postgres database.",
 ];
 
 export const STATUS_NOT_DONE: string[] = [
