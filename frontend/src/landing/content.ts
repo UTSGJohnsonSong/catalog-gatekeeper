@@ -131,10 +131,11 @@ export const STACK: string[] = [
 // What is true today. This section is meant to be rewritten when that changes, so it holds no install steps.
 export const STORE_DATA: string[] = [
   "The public demo uses a simulated store and synthetic products. No merchant's store is connected to it.",
-  "The live adapter is written for a single store and needs two permissions: read_products and write_products. It reads product fields only, such as titles, descriptions, search text, variants, prices and image alt text. It reads no customer data and no orders. So far it has run only against a mocked Shopify server.",
+  "The live adapter serves one store and needs two permissions: read_products and write_products. It reads product fields only: titles, descriptions, search text, tags, vendor, type, status, variants with their prices, and image alt text. It reads no customers and no orders. So far it has run only against a mocked Shopify server.",
   "The app keeps its own records in Postgres: the products it read, their findings, the proposed fixes with their checks and reviews, the audit log, each webhook delivery as received, each agent run's transcript, and a copy of a product's fields before each write.",
   "When a hosted LLM drafts the fixes, it is sent the text of the product it works on and the policy passages it searches. The public demo uses no hosted LLM.",
-  "The store's credentials live in the server's environment, never in the database. They are either one token set by hand, or the app's client ID and secret, from which the server gets a 24-hour token and keeps it in memory.",
+  "Run from a shell, the store's credentials live in the server's environment: one token set by hand, or the app's client ID and secret, from which the server gets a 24-hour token and keeps it in memory.",
+  "In embedded mode the store's token comes from Shopify's token exchange. It expires after an hour, is refreshed before then, and is stored in Postgres encrypted with AES-256-GCM. Uninstalling the app deletes it at once, and Shopify's erasure request 48 hours later deletes the store's catalog.",
 ];
 
 // README.md, "What is real and what is not" and "Limits", and docs/DEMO_HONESTY.md.
@@ -143,10 +144,12 @@ export const STATUS_DONE: string[] = [
   "The rules and the citation checker are measured on a frozen synthetic test split, with Wilson intervals.",
   "A hosted LLM has run the agent once, on 40 synthetic products.",
   "The MCP server has run over streamable HTTP.",
+  "Embedded mode: the review screen opens inside a store's Shopify admin, signs people in with Shopify's session tokens, exchanges them for expiring store tokens and answers the mandatory privacy webhooks. It is tested against a mocked Shopify server and a real Postgres database.",
 ];
 
 export const STATUS_NOT_DONE: string[] = [
-  "It is not a public Shopify app: there is no OAuth install, no compliance webhooks and no session tokens.",
+  "It is not in the Shopify App Store: one deployment serves one store, and there is no billing.",
+  "Embedded mode has not yet run against Shopify itself; its tests use a mocked Shopify server.",
   "The live adapter has been tested only against a mock. It has never called a store.",
   "The rules are English word lists, so they miss paraphrases and can block plain English by mistake.",
   "The eval data is synthetic, and its author also wrote the rules.",

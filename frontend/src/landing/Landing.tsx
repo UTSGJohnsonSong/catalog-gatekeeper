@@ -14,7 +14,10 @@ import { CHECK_NAMES, GateRun, type Check } from "./GateRun";
 import { Lane } from "./Lane";
 import sample from "./sample.json";
 
-const DEMO_URL = "/app/";
+// The API serves the review screen at /app/. A static copy of this page (scripts/publish_pages.py) has no API, so
+// its build names the hosted demo instead.
+const DEMO_URL: string = import.meta.env.VITE_DEMO_URL ?? "/app/";
+const ON_STATIC_HOST = /^https?:/.test(DEMO_URL);
 
 // Every figure in the numbers section is copied from a report in eval/reports/, and Landing.test.tsx pins the copies.
 // Change both together: validators-test-20261101T014916Z.json, citations-test-20261101T014916Z.json,
@@ -57,6 +60,7 @@ function Docket({ fix, animate }: { fix: Fix; animate: boolean }) {
 function useResetMinutes(): number | null {
   const [minutes, setMinutes] = useState<number | null>(null);
   useEffect(() => {
+    if (ON_STATIC_HOST) return; // No API behind a static copy, so there is nothing to ask.
     let live = true;
     fetch("/api/meta")
       .then((response) => (response.ok ? response.json() : null))
@@ -283,10 +287,14 @@ export function Landing({ animate = true }: { animate?: boolean }) {
         </section>
 
         <section id="data" className="section" aria-labelledby="data-title">
-          <h2 id="data-title">Your store&apos;s data</h2>
+          <h2 id="data-title">Store data</h2>
           {STORE_DATA.map((paragraph) => (
             <p key={paragraph}>{paragraph}</p>
           ))}
+          <p>
+            {/* Relative, so it works under the API server and under a static host's base path alike. */}
+            <a href="privacy/">Read the privacy page</a> for what is kept and how a store&apos;s data is deleted.
+          </p>
         </section>
 
         <section id="status" className="section" aria-labelledby="status-title">
@@ -330,7 +338,7 @@ export function Landing({ animate = true }: { animate?: boolean }) {
       <footer className="colophon">
         <p>
           FastAPI, Postgres with pgvector and a Postgres job queue behind the scenes. The review screen is built with
-          Shopify&apos;s Polaris web components; this page is not.
+          Shopify&apos;s Polaris web components; this page is not. <a href="privacy/">Privacy</a>
         </p>
       </footer>
     </>
