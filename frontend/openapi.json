@@ -735,8 +735,8 @@
    },
    "ShopifySession": {
     "properties": {
-     "first_connection": {
-      "title": "First Connection",
+     "connected_now": {
+      "title": "Connected Now",
       "type": "boolean"
      },
      "shop_domain": {
@@ -746,7 +746,7 @@
     },
     "required": [
      "shop_domain",
-     "first_connection"
+     "connected_now"
     ],
     "title": "ShopifySession",
     "type": "object"

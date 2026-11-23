@@ -169,6 +169,8 @@ def test_embedded_settings_are_accepted_and_sign_webhooks_with_the_client_secret
         ({"shopify_webhook_secret": "another"}, "unset SHOPIFY_WEBHOOK_SECRET"),
         ({"shopify_client_id": "has spaces and <tags>"}, "letters and digits"),
         ({"shopify_client_id": None, "shopify_client_secret": None}, "SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET"),
+        ({"public_demo": True}, "cannot run as the public demo"),
+        ({"shopify_access_token": "shpat_set_by_hand"}, "unset SHOPIFY_ACCESS_TOKEN"),
     ],
 )
 def test_embedded_settings_that_are_refused(overrides, message):
@@ -252,23 +254,32 @@ def test_refresh_sends_the_refresh_token():
     assert seen[0]["grant_type"] == "refresh_token" and seen[0]["refresh_token"] == "r1"
 
 
-def test_a_token_that_does_not_expire_is_kept_as_such():
-    grant = endpoint(lambda r: httpx.Response(200, json={"access_token": "a", "scope": "read_products"})).exchange("t")
-    assert grant.access_expires_at is None and grant.refresh_token is None
+def test_a_token_that_does_not_expire_is_refused():
+    # The app always asks for an expiring token, so an answer without expiry is one it does not understand.
+    with pytest.raises(ShopifyAuthError, match="does not expire"):
+        endpoint(lambda r: httpx.Response(200, json={"access_token": "a", "scope": "read_products"})).exchange("t")
 
 
 @pytest.mark.parametrize(
     ("response", "call", "error"),
     [
-        (httpx.Response(400, json={"error": "invalid_subject_token"}), "exchange", SessionTokenRejected),
-        (httpx.Response(401, json={"error": "invalid_client"}), "exchange", ShopifyAuthError),
-        (httpx.Response(401, json={"error": "invalid_request"}), "refresh", RefreshRejected),
-        (httpx.Response(400, json={"error": "invalid_grant"}), "refresh", RefreshRejected),
-        (httpx.Response(429, headers={"Retry-After": "7"}), "refresh", ShopifyThrottled),
-        (httpx.Response(503), "exchange", ShopifyTransient),
-        (httpx.Response(200, text="<html>"), "exchange", ShopifyTransient),
-        (httpx.Response(200, json={"scope": "x"}), "exchange", ShopifyAuthError),
-        (httpx.Response(200, json={"access_token": "a", "expires_in": 3600}), "exchange", ShopifyAuthError),
+        (
+            httpx.Response(400, json={"error": "invalid_subject_token", "echo": SECRET}),
+            "exchange",
+            SessionTokenRejected,
+        ),
+        (httpx.Response(401, json={"error": "invalid_client", "echo": SECRET}), "exchange", ShopifyAuthError),
+        (httpx.Response(401, json={"error": "invalid_request", "echo": SECRET}), "refresh", RefreshRejected),
+        (httpx.Response(400, json={"error": "invalid_grant", "echo": SECRET}), "refresh", RefreshRejected),
+        (httpx.Response(429, headers={"Retry-After": "7"}, text=SECRET), "refresh", ShopifyThrottled),
+        (httpx.Response(503, text=SECRET), "exchange", ShopifyTransient),
+        (httpx.Response(200, text=f"<html>{SECRET}"), "exchange", ShopifyTransient),
+        (httpx.Response(200, json={"scope": "x", "echo": SECRET}), "exchange", ShopifyAuthError),
+        (
+            httpx.Response(200, json={"access_token": "a", "expires_in": 3600, "echo": SECRET}),
+            "exchange",
+            ShopifyAuthError,
+        ),
         (
             httpx.Response(
                 200, json={"access_token": "a", "expires_in": True, "refresh_token": "r", "refresh_token_expires_in": 9}
@@ -341,19 +352,21 @@ def live_store(partner_development: object) -> tuple[LiveShopify, list[str]]:
     return store, operations
 
 
-def test_template_writes_go_to_a_development_store_after_one_check():
+def test_template_writes_go_to_a_development_store_asking_before_each_write():
     store, operations = live_store(True)
     store.update_product("gid://shopify/Product/1", {"description_html": "<p>New</p>"})
     store.update_product("gid://shopify/Product/1", {"description_html": "<p>Newer</p>"})
-    assert operations == ["ShopPlan", "ProductUpdate", "ProductUpdate"]
+    # A development store handed over to a merchant stops being one, so a yes is never remembered.
+    assert operations == ["ShopPlan", "ProductUpdate", "ShopPlan", "ProductUpdate"]
 
 
 @pytest.mark.parametrize("answer", [False, None, "true"])
 def test_template_writes_never_reach_a_store_that_is_not_a_development_store(answer):
     store, operations = live_store(answer)
-    with pytest.raises(ShopifyAuthError, match="development stores"):
-        store.update_product("gid://shopify/Product/1", {"description_html": "<p>New</p>"})
-    assert operations == ["ShopPlan"]
+    for _ in range(2):
+        with pytest.raises(ShopifyAuthError, match="development stores"):
+            store.update_product("gid://shopify/Product/1", {"description_html": "<p>New</p>"})
+    assert operations == ["ShopPlan"]  # a no is remembered, and nothing was written
 
 
 # The review page inside the admin ---------------------------------------------------------------------------------
@@ -462,3 +475,73 @@ def test_the_privacy_page_is_served_without_the_api_and_cannot_be_framed(tmp_pat
             page = client.get(path)
             assert page.status_code == 200 and "privacy" in page.text
             assert page.headers["x-frame-options"] == "DENY"
+
+
+# Wiring that a unit of its own would not catch ------------------------------------------------------------------
+
+
+def test_the_wired_adapter_refuses_template_writes_to_a_store_that_is_not_a_development_store():
+    # Built the way the app builds it, so dropping development_store_only in context.py fails this test.
+    from gatekeeper.context import build_shopify
+
+    operations: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        operations.append(json.loads(request.content)["operationName"])
+        return httpx.Response(200, json={"data": {"shop": {"plan": {"partnerDevelopment": False}}}})
+
+    settings = Settings(
+        env="test",
+        shopify_adapter="live",
+        shopify_shop_domain=SHOP,
+        shopify_access_token="shpat_set_by_hand",
+        writeback_enabled=True,
+        llm_provider="heuristic",
+        allow_template_writes_to_dev_store=True,
+    )
+    store = build_shopify(settings, None, transport=httpx.MockTransport(handler))  # type: ignore[arg-type]
+    with pytest.raises(ShopifyAuthError, match="development stores"):
+        store.update_product("gid://shopify/Product/1", {"description_html": "<p>New</p>"})
+    assert operations == ["ShopPlan"]
+
+
+def test_a_session_tokens_own_signature_signs_its_header_and_payload_as_a_webhook():
+    # Why lifecycle webhooks must carry a JSON body that names the store: the client secret signs both, so this
+    # forged webhook passes the signature check. services/webhooks.record_event refuses it on the body.
+    from gatekeeper.shopify import webhook_hmac
+
+    header, payload, signature = make_session_token().split(".")
+    raw = f"{header}.{payload}".encode()
+    as_webhook = base64.b64encode(base64.urlsafe_b64decode(signature + "=" * (-len(signature) % 4))).decode()
+    assert webhook_hmac.verify(SECRET, raw, as_webhook)
+    with pytest.raises(ValueError):
+        json.loads(raw)
+
+
+def test_a_context_must_carry_store_tokens_exactly_in_embedded_mode():
+    from gatekeeper.context import AppContext
+
+    with pytest.raises(ValueError, match="store_auth"):
+        AppContext(embedded_settings(), None, None, None, None, None, 1)  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="store_auth"):
+        AppContext(Settings(env="test"), None, None, None, None, None, 1, object())  # type: ignore[arg-type]
+
+
+def test_only_a_token_outside_its_time_window_is_worth_a_retry():
+    for overrides, retryable in (
+        ({"exp": int(time.time()) - 60}, True),
+        ({"nbf": int(time.time()) + 60}, True),
+        ({"aud": "another-app"}, False),
+        ({"_secret": "a-different-secret-" * 4}, False),
+        ({"dest": "https://other-store.myshopify.com", "iss": "https://other-store.myshopify.com/admin"}, False),
+    ):
+        with pytest.raises(session_token.InvalidSessionToken) as caught:
+            verify(make_session_token(**overrides))
+        assert caught.value.retryable is retryable, overrides
+
+
+def test_a_refresh_refused_for_the_apps_own_credentials_is_not_a_dead_refresh_token():
+    response = httpx.Response(401, json={"error": "invalid_client"})
+    with pytest.raises(ShopifyAuthError, match="SHOPIFY_CLIENT_SECRET") as caught:
+        endpoint(lambda r: response).refresh("t")
+    assert not isinstance(caught.value, RefreshRejected)

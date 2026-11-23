@@ -15,6 +15,7 @@ from gatekeeper.db import tx
 from gatekeeper.services.catalog import write_audit
 from gatekeeper.shopify.offline_tokens import (
     StoreAuth,
+    TokenUnreadable,
     delete_grant,
     load_grant,
     lock_store_tokens,
@@ -50,17 +51,22 @@ def _auth(ctx: AppContext) -> StoreAuth:
 def connect_store(ctx: AppContext, session: SessionToken) -> bool:
     """Makes sure a usable token is stored, exchanging the session token only when none is.
 
-    Returns True when this call connected the store, so the caller can start the first sync. Exchanging on every
-    open would retire the token the worker is using, so a stored token that can still be used or refreshed wins."""
+    Returns True when this call stored a new token, so the caller can queue a sync: on the first open, and on the
+    first open after an uninstall, an expired or refused refresh token, or a new TOKEN_ENCRYPTION_KEY. Exchanging on
+    every open would retire the token the worker is using, so a stored token that can still be refreshed wins."""
     auth = _auth(ctx)
+    # The configured store, which the token source reads with. verify() has checked that the session names it.
+    domain = ctx.settings.shopify_shop_domain
     with tx(ctx.pool, ACTOR) as conn:
         lock_store_tokens(conn, ctx.shop_id)
-        now = utc_now()
-        current = load_grant(conn, ctx.shop_id, session.shop_domain, auth.cipher)
-        if current is not None and (current.refresh_usable(now) or current.access_usable(now)):
+        try:
+            current = load_grant(conn, ctx.shop_id, domain, auth.cipher)
+        except TokenUnreadable:
+            current = None  # Exchanged again below; the new token overwrites the unreadable row.
+        if current is not None and current.refresh_usable(utc_now()):
             return False
         grant = auth.endpoint.exchange(session.raw)
-        save_grant(conn, ctx.shop_id, session.shop_domain, auth.cipher, grant)
+        save_grant(conn, ctx.shop_id, domain, auth.cipher, grant)
         conn.execute(
             "UPDATE shops SET installed_at = coalesce(installed_at, now()), uninstalled_at = NULL, redacted_at = NULL "
             "WHERE id = %s",
@@ -73,7 +79,7 @@ def connect_store(ctx: AppContext, session: SessionToken) -> bool:
             "shop",
             str(ctx.shop_id),
             ctx.shop_id,
-            {"scope": grant.scope, "expiring": grant.refresh_token is not None},
+            {"scope": grant.scope},
         )
     return True
 

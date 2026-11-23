@@ -53,6 +53,13 @@ def record_event(
 ) -> str:
     """The whole synchronous path: one insert and one enqueue, which fits Shopify's 5 second limit."""
     if topic in LIFECYCLE_TOPICS:
+        named = _store_named_in(raw_body)
+        if named != shop_domain.lower():
+            # These webhooks act on their topic, which sits outside the signature, so the signed body has to name
+            # this store. It matters because the client secret also signs session tokens: a session token's own
+            # signature is a valid webhook signature for the token's header and payload, which is not JSON.
+            log.warning("signed %s webhook ignored: its body does not name this store", topic)
+            return "ignored"
         # Not kept: customer requests name the customer, and the uninstall notice carries the merchant's contact
         # details. The topic alone says what to do.
         payload: Any = {"not_stored": True}
@@ -77,6 +84,19 @@ def record_event(
             (Jsonb({"event_row_id": row["id"]}), f"wh:{webhook_id}"),
         )
     return "accepted"
+
+
+def _store_named_in(raw_body: bytes) -> str | None:
+    """The store a lifecycle body names: `shop_domain` in the privacy webhooks, `myshopify_domain` in the shop object
+    that app/uninstalled carries. None when the body is not a JSON object or names no store."""
+    try:
+        body = json.loads(raw_body)
+    except ValueError:
+        return None
+    if not isinstance(body, dict):
+        return None
+    named = body.get("shop_domain", body.get("myshopify_domain"))
+    return named.lower() if isinstance(named, str) else None
 
 
 def _gid_from_payload(payload: Any) -> str | None:

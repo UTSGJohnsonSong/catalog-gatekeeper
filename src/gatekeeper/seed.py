@@ -20,6 +20,7 @@ from gatekeeper.rag.store import ingest_directory
 from gatekeeper.services.sync import sync_catalog
 from gatekeeper.shopify.fixture import FixtureShopify
 from gatekeeper.shopify.offline_tokens import ShopNotConnected
+from gatekeeper.shopify.port import ShopifyError
 from gatekeeper.worker import configure_logging
 
 log = logging.getLogger("gatekeeper.seed")
@@ -128,9 +129,13 @@ def load_store(settings: Settings) -> None:
             log.info("demo products loaded: %d", loaded)
         try:
             log.info("first sync: %s", sync_catalog(ctx, actor="seed"))
-        except ShopNotConnected:
+        except ShopNotConnected as exc:
             # Embedded, before anyone opened the app: the token arrives with the first open, which queues a sync.
-            log.info("first sync skipped: the store connects when a merchant first opens the app")
+            log.warning("first sync skipped: %s", exc)
+        except ShopifyError as exc:
+            # The review page and the privacy webhooks do not need the store, so the app still starts.
+            log.error("first sync failed (%s); a sync job is queued to try again", exc)
+            jobs.enqueue(ctx.pool, "sync", {})
         if settings.demo_mode and settings.demo_autorun:
             with tx(ctx.pool) as conn:
                 rows = conn.execute(

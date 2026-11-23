@@ -23,6 +23,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
+from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
 from gatekeeper.config import MYSHOPIFY_DOMAIN
@@ -41,6 +42,9 @@ REFRESH_MARGIN = timedelta(minutes=5)
 # After a failed early renewal, the next attempt waits this long, or as long as Retry-After says.
 RENEWAL_BACKOFF_SECONDS = 30.0
 ACTOR = "shopify-auth"
+# OAuth error codes that mean the refresh token itself is dead. Anything else, invalid_client above all, points at the
+# app's own configuration, and a refresh token that may still be good is kept.
+DEAD_REFRESH_TOKEN_CODES = {"invalid_request", "invalid_grant"}
 
 
 def utc_now() -> datetime:
@@ -49,6 +53,10 @@ def utc_now() -> datetime:
 
 class ShopNotConnected(ShopifyAuthError):
     """No usable token is stored. The merchant reconnects the store by opening the app in the Shopify admin."""
+
+
+class TokenUnreadable(ShopNotConnected):
+    """A token is stored but does not decrypt, usually because TOKEN_ENCRYPTION_KEY changed."""
 
 
 class RefreshRejected(ShopifyAuthError):
@@ -61,20 +69,41 @@ class SessionTokenRejected(Exception):
 
 @dataclass(frozen=True)
 class TokenGrant:
+    """An expiring offline token: an access token for about an hour and a refresh token for about 90 days.
+
+    Shopify requires expiring tokens for new public apps, and this app always asks for one (`expiring=1`), so a token
+    that does not expire is refused where the answer is parsed. The table's NOT NULL columns hold the same shape."""
+
     access_token: str
     scope: str
-    access_expires_at: datetime | None  # None for an offline token that does not expire
-    refresh_token: str | None
-    refresh_expires_at: datetime | None
+    access_expires_at: datetime
+    refresh_token: str
+    refresh_expires_at: datetime
+
+    def __post_init__(self) -> None:
+        if not self.access_token or not self.refresh_token:
+            raise ValueError("a token grant needs both an access token and a refresh token")
+        if self.access_expires_at.tzinfo is None or self.refresh_expires_at.tzinfo is None:
+            raise ValueError("token expiry times must carry a time zone")
 
     def __repr__(self) -> str:
         return f"TokenGrant(scope={self.scope!r}, access_expires_at={self.access_expires_at!r}, tokens=***)"
 
     def access_usable(self, now: datetime, margin: timedelta = timedelta(0)) -> bool:
-        return self.access_expires_at is None or now < self.access_expires_at - margin
+        return now < self.access_expires_at - margin
 
     def refresh_usable(self, now: datetime) -> bool:
-        return self.refresh_token is not None and self.refresh_expires_at is not None and now < self.refresh_expires_at
+        return now < self.refresh_expires_at
+
+
+def _error_code(response: httpx.Response) -> str | None:
+    """The OAuth `error` code, if it is a plain code. Nothing else from an error body is ever repeated."""
+    try:
+        body = response.json()
+    except ValueError:
+        return None
+    code = body.get("error") if isinstance(body, dict) else None
+    return code if isinstance(code, str) and code.replace("_", "").isalpha() and len(code) <= 40 else None
 
 
 def _seconds(value: Any) -> float | None:
@@ -129,7 +158,13 @@ class TokenEndpoint:
             {"grant_type": "refresh_token", "refresh_token": refresh_token}, purpose="token refresh"
         )
         if response.status_code in (400, 401):
-            raise RefreshRejected(f"Shopify rejected the refresh token with HTTP {response.status_code}")
+            code = _error_code(response)
+            if code in DEAD_REFRESH_TOKEN_CODES:
+                raise RefreshRejected(f"Shopify refused the refresh token (HTTP {response.status_code}, {code})")
+            raise ShopifyAuthError(
+                f"token refresh rejected with HTTP {response.status_code} ({code or 'no error code'}); "
+                "check SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET"
+            )
         return self._grant(response, started, purpose="token refresh")
 
     def _request(self, fields: dict[str, str], *, purpose: str) -> tuple[httpx.Response, datetime]:
@@ -163,11 +198,10 @@ class TokenEndpoint:
         raw_scope = body.get("scope")
         scope = raw_scope if isinstance(raw_scope, str) else ""
         refresh = body.get("refresh_token")
-        if body.get("expires_in") is None and refresh is None:
-            return TokenGrant(access, scope, None, None, None)
         lifetime, refresh_lifetime = _seconds(body.get("expires_in")), _seconds(body.get("refresh_token_expires_in"))
         if lifetime is None or refresh_lifetime is None or not isinstance(refresh, str) or not refresh:
-            raise ShopifyAuthError(f"{purpose} returned an incomplete expiring token")
+            # This app always asks for an expiring token, so anything else is an answer it does not understand.
+            raise ShopifyAuthError(f"{purpose} returned a token that does not expire, or an incomplete one")
         return TokenGrant(
             access,
             scope,
@@ -207,22 +241,16 @@ def load_grant(conn: Conn, shop_id: int, shop_domain: str, cipher: TokenCipher) 
         return None
     try:
         access = cipher.decrypt(bytes(row["access_token"]), context=_context(shop_domain, "access"))
-        refresh = (
-            cipher.decrypt(bytes(row["refresh_token"]), context=_context(shop_domain, "refresh"))
-            if row["refresh_token"] is not None
-            else None
-        )
-    except TokenDecryptError:
+        refresh = cipher.decrypt(bytes(row["refresh_token"]), context=_context(shop_domain, "refresh"))
+    except TokenDecryptError as exc:
         # A changed TOKEN_ENCRYPTION_KEY lands here. The next app open exchanges a new token and overwrites the row.
-        log.error("the stored store token does not decrypt with TOKEN_ENCRYPTION_KEY; the merchant must reconnect")
-        return None
+        raise TokenUnreadable(
+            "the stored store token does not decrypt with TOKEN_ENCRYPTION_KEY; open the app from the Shopify admin"
+        ) from exc
     return TokenGrant(access, row["scope"], row["access_expires_at"], refresh, row["refresh_expires_at"])
 
 
 def save_grant(conn: Conn, shop_id: int, shop_domain: str, cipher: TokenCipher, grant: TokenGrant) -> None:
-    refresh = (
-        cipher.encrypt(grant.refresh_token, context=_context(shop_domain, "refresh")) if grant.refresh_token else None
-    )
     conn.execute(
         "INSERT INTO shop_credentials "
         "(shop_id, access_token, access_expires_at, refresh_token, refresh_expires_at, scope, updated_at) "
@@ -234,8 +262,8 @@ def save_grant(conn: Conn, shop_id: int, shop_domain: str, cipher: TokenCipher, 
             shop_id,
             cipher.encrypt(grant.access_token, context=_context(shop_domain, "access")),
             grant.access_expires_at,
-            refresh,
-            grant.refresh_expires_at if refresh else None,
+            cipher.encrypt(grant.refresh_token, context=_context(shop_domain, "refresh")),
+            grant.refresh_expires_at,
             grant.scope,
         ),
     )
@@ -243,6 +271,17 @@ def save_grant(conn: Conn, shop_id: int, shop_domain: str, cipher: TokenCipher, 
 
 def delete_grant(conn: Conn, shop_id: int) -> bool:
     return conn.execute("DELETE FROM shop_credentials WHERE shop_id = %s", (shop_id,)).rowcount > 0
+
+
+def _disconnect(conn: Conn, shop_id: int, reason: str) -> None:
+    """Forgets a token that can never work again, and says so in the log and the audit log."""
+    delete_grant(conn, shop_id)
+    log.error("store disconnected: %s; open the app from the Shopify admin to reconnect", reason)
+    conn.execute(
+        "INSERT INTO audit_log (actor, action, entity_type, entity_id, shop_id, detail) "
+        "VALUES (%s, 'shop.disconnected', 'shop', %s, %s, %s)",
+        (ACTOR, str(shop_id), shop_id, Jsonb({"reason": reason})),
+    )
 
 
 # The token source the live adapter uses ---------------------------------------------------------------------------
@@ -310,19 +349,16 @@ class StoredOfflineToken:
             rejected = grant.access_token == self._rejected
             if not rejected and grant.access_usable(now, self._margin):
                 return grant  # Still fresh, or another process refreshed it already.
-            if grant.refresh_token is None:
-                if rejected:
-                    raise ShopNotConnected("the store rejected its token; open the app from the Shopify admin")
-                return grant
             if not grant.refresh_usable(now):
-                delete_grant(conn, self._shop_id)
+                _disconnect(conn, self._shop_id, "the refresh token expired")
                 failure = ShopNotConnected("the refresh token expired; open the app from the Shopify admin")
             else:
                 try:
                     renewed = self._auth.endpoint.refresh(grant.refresh_token)
-                except RefreshRejected:
-                    delete_grant(conn, self._shop_id)
+                except RefreshRejected as exc:
+                    _disconnect(conn, self._shop_id, str(exc))
                     failure = ShopNotConnected("Shopify refused the refresh token; open the app from the Shopify admin")
+                    failure.__cause__ = exc
                 except (ShopifyTransient, ShopifyThrottled) as exc:
                     # Renewing early is a courtesy. While the current token still works, a hiccup at the token
                     # endpoint must not fail a call that would have worked, nor be retried on every call.

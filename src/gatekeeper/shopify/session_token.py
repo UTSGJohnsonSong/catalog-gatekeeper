@@ -18,7 +18,14 @@ REQUIRED_CLAIMS = ["exp", "nbf", "iss", "dest", "aud", "sub"]
 
 
 class InvalidSessionToken(Exception):
-    """The token is not one Shopify issued to this app's frontend for this store."""
+    """The token is not one Shopify issued to this app's frontend for this store.
+
+    `retryable` is true only for a token outside its one-minute window, which a fresh token from App Bridge fixes. A
+    bad signature, audience or store means a wrong setting, or a forgery, and a retry cannot help."""
+
+    def __init__(self, reason: str, *, retryable: bool = False):
+        super().__init__(reason)
+        self.retryable = retryable
 
 
 @dataclass(frozen=True)
@@ -46,6 +53,8 @@ def verify(token: str, *, client_id: str, client_secret: str, shop_domain: str) 
             leeway=LEEWAY_SECONDS,
             options={"require": REQUIRED_CLAIMS},
         )
+    except (jwt.ExpiredSignatureError, jwt.ImmatureSignatureError) as exc:
+        raise InvalidSessionToken(type(exc).__name__, retryable=True) from exc
     except jwt.PyJWTError as exc:
         # The library's message can quote claims, so only the error class is kept.
         raise InvalidSessionToken(type(exc).__name__) from exc

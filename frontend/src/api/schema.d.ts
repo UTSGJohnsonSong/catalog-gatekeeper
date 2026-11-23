@@ -569,8 +569,8 @@ export interface components {
         };
         /** ShopifySession */
         ShopifySession: {
-            /** First Connection */
-            first_connection: boolean;
+            /** Connected Now */
+            connected_now: boolean;
             /** Shop Domain */
             shop_domain: string;
         };

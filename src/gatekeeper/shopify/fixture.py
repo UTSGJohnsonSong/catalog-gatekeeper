@@ -104,6 +104,9 @@ class FixtureShopify:
             row = conn.execute("SELECT data FROM fixture.products WHERE gid = %s", (gid,)).fetchone()
         return Product.from_dict(row["data"]) if row else None
 
+    def ensure_writable(self) -> None:
+        return None  # The simulated store takes every write.
+
     def update_product(
         self, gid: str, fields: Mapping[str, str], *, expected_content_hash: str | None = None
     ) -> UpdateResult:

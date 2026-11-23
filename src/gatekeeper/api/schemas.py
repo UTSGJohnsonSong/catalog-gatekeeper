@@ -27,8 +27,9 @@ class Meta(BaseModel):
 
 class ShopifySession(BaseModel):
     shop_domain: str
-    # True when this call stored the store's first token and queued the first sync.
-    first_connection: bool
+    # True when this call stored a new store token and queued a sync: the first open, or the first after an uninstall,
+    # an expired refresh token or a new encryption key.
+    connected_now: bool
 
 
 class Whoami(BaseModel):

@@ -65,10 +65,11 @@ def demo_token(settings: Settings) -> str | None:
     return None
 
 
-def session_rejected(detail: str = "Session token missing or invalid") -> HTTPException:
-    return HTTPException(
-        status.HTTP_401_UNAUTHORIZED, detail, {"WWW-Authenticate": "Bearer", RETRY_SESSION_HEADER: "1"}
-    )
+def session_rejected(detail: str = "Session token missing or invalid", *, retry: bool = False) -> HTTPException:
+    headers = {"WWW-Authenticate": "Bearer"}
+    if retry:
+        headers[RETRY_SESSION_HEADER] = "1"
+    return HTTPException(status.HTTP_401_UNAUTHORIZED, detail, headers)
 
 
 def _verify_session(settings: Settings, raw: str) -> SessionToken:
@@ -82,7 +83,15 @@ def _verify_session(settings: Settings, raw: str) -> SessionToken:
             shop_domain=settings.shopify_shop_domain,
         )
     except session_token.InvalidSessionToken as exc:
-        log.info("session token rejected: %s", exc)
+        if exc.retryable:
+            log.info("session token outside its time window: %s", exc)
+            raise session_rejected(retry=True) from exc
+        # A wrong setting or a forgery. Warning, not error: anyone can send a bad token.
+        log.warning(
+            "session token refused (%s); if this repeats, check SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET and "
+            "SHOPIFY_SHOP_DOMAIN",
+            exc,
+        )
         raise session_rejected() from exc
 
 

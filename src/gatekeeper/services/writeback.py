@@ -22,6 +22,7 @@ from gatekeeper.context import AppContext
 from gatekeeper.db import tx
 from gatekeeper.domain.product import ALLOWED_FIELDS, Product, approval_hash, content_hash, fields_hash
 from gatekeeper.services.catalog import active_title_counts, refresh_findings, upsert_product, write_audit
+from gatekeeper.shopify.port import WritesNotAllowed
 
 log = logging.getLogger("gatekeeper.writeback")
 ACTOR = "worker:apply"
@@ -151,6 +152,18 @@ def _apply_locked(ctx: AppContext, proposal_id: str) -> ApplyResult:
             user_errors=[{"message": f"needs_human: gave up after {row['attempts']} write attempts"}],
         )
         return ApplyResult("failed", "too many write attempts")
+    try:
+        # Before the write is recorded as sent, so a refusal ends the proposal cleanly instead of leaving it applying.
+        ctx.shopify.ensure_writable()
+    except WritesNotAllowed as exc:
+        _transition(
+            ctx,
+            proposal_id,
+            "failed",
+            writeback_status="failed",
+            user_errors=[{"message": f"writes_not_allowed: {exc}"}],
+        )
+        return ApplyResult("failed", "writes not allowed")
 
     with tx(ctx.pool, ACTOR) as conn:
         enabled = conn.execute("SELECT writeback_enabled FROM shops WHERE id = %s", (row["shop_id"],)).fetchone()[

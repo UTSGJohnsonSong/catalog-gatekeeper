@@ -50,6 +50,7 @@ from gatekeeper.services.writeback import set_kill_switch
 from gatekeeper.shopify import webhook_hmac
 from gatekeeper.shopify.fixture import FixtureShopify
 from gatekeeper.shopify.offline_tokens import SessionTokenRejected
+from gatekeeper.shopify.port import ShopifyAuthError, ShopifyThrottled, ShopifyTransient
 from gatekeeper.shopify.session_token import SessionToken
 from gatekeeper.worker import configure_logging
 
@@ -272,10 +273,22 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
         try:
             connected = shop_lifecycle.connect_store(ctx_, session)
         except SessionTokenRejected as exc:
-            raise session_rejected("Shopify rejected the session token; App Bridge retries with a new one") from exc
+            log.warning("Shopify refused a session token in token exchange")
+            raise session_rejected("Shopify refused the session token. Open the app again.", retry=True) from exc
+        except (ShopifyThrottled, ShopifyTransient) as exc:
+            wait = max(1, int(exc.retry_after)) if isinstance(exc, ShopifyThrottled) else 5
+            log.warning("token exchange did not complete: %s", exc)
+            raise HTTPException(
+                503, "Shopify did not answer in time. Try again in a moment.", {"Retry-After": str(wait)}
+            ) from exc
+        except ShopifyAuthError as exc:
+            log.error("token exchange refused: %s; check SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET", exc)
+            raise HTTPException(
+                502, "Shopify refused this app's credentials. The app's operator must check them."
+            ) from exc
         if connected:
             jobs.enqueue(ctx_.pool, "sync", {})
-        return schemas.ShopifySession(shop_domain=session.shop_domain, first_connection=connected)
+        return schemas.ShopifySession(shop_domain=session.shop_domain, connected_now=connected)
 
     @app.get("/api/whoami", response_model=schemas.Whoami, tags=["meta"])
     def whoami(principal: Principal = Depends(current_principal)) -> schemas.Whoami:

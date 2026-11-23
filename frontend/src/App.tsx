@@ -58,10 +58,10 @@ export function EmbeddedApp() {
           </Page>
         ) : (
           <>
-            {session.data.first_connection && (
+            {session.data.connected_now && (
               <s-banner tone="info" heading="Reading your catalog">
-                The app is reading your products for the first time. Findings appear on the Products page within a
-                minute, and no fix is drafted until you ask for one.
+                The app is connected to your store and is reading your products. Findings appear on the Products page
+                within a minute, and no fix is drafted until you ask for one.
               </s-banner>
             )}
             <AppRoutes />

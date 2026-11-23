@@ -34,6 +34,11 @@ class AppContext:
     # Only in embedded mode: how the store's token is exchanged, refreshed and encrypted.
     store_auth: StoreAuth | None = None
 
+    def __post_init__(self) -> None:
+        # Caught here rather than as a 500 on the first request that needs a store token.
+        if self.settings.shopify_embedded != (self.store_auth is not None):
+            raise ValueError("store_auth must be set exactly when SHOPIFY_EMBEDDED is on")
+
 
 def build_store_auth(settings: Settings, *, transport: httpx.BaseTransport | None = None) -> StoreAuth | None:
     if not settings.shopify_embedded:

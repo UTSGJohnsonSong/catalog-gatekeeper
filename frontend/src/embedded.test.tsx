@@ -98,7 +98,7 @@ describe("the app inside the admin", () => {
   it("shows no sign-in page, connects the store, and puts its menu in the admin", async () => {
     embed();
     serve((url) => {
-      if (url.startsWith("/api/shopify/session")) return json({ shop_domain: "x.myshopify.com", first_connection: true });
+      if (url.startsWith("/api/shopify/session")) return json({ shop_domain: "x.myshopify.com", connected_now: true });
       if (url.startsWith("/api/meta")) return json(META);
       if (url.startsWith("/api/queue")) return json({ items: [], counts: {} });
       if (url.startsWith("/api/whoami")) return json({ name: "shopify:42", role: "admin" });
@@ -108,7 +108,7 @@ describe("the app inside the admin", () => {
     renderWithProviders(<App />);
     expect(document.querySelector("s-app-nav s-link[rel='home']")?.getAttribute("href")).toBe("/app/");
     expect(screen.getByText("Connecting to your store…")).toBeTruthy();
-    await waitFor(() => expect(screen.getByText(/reading your products for the first time/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/is reading your products/)).toBeTruthy());
     expect(screen.queryByText(/Sign in/)).toBeNull();
   });
 

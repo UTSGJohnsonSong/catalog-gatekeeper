@@ -90,14 +90,15 @@ def run_job(ctx: AppContext, job: dict) -> None:
         log.warning("store throttled the request", extra=extra)
         jobs.defer(ctx.pool, job_id, max(1, int(exc.retry_after) + 1), "throttled")
     except ShopNotConnected as exc:
-        if kind != "sync":
-            log.error("%s", exc, extra=extra)
-            jobs.fail(ctx.pool, job, str(exc), retryable=False)
+        if kind == "sync" and not _ever_connected_and_installed(ctx):
+            # Before the first open, or after an uninstall, a scheduled sync has nothing to read. That is not a
+            # failure, and the next connection queues a sync of its own.
+            log.info("sync skipped: %s", exc, extra=extra)
+            jobs.complete(ctx.pool, job_id)
             return
-        # A scheduled sync before the first open, or after an uninstall, has nothing to read. That is not a failure,
-        # and the next connection queues a sync of its own.
-        log.warning("sync skipped: %s", exc, extra=extra)
-        jobs.complete(ctx.pool, job_id)
+        # A store that was connected lost its token: the ops page counts the dead job, so a person notices.
+        log.error("%s", exc, extra=extra)
+        jobs.fail(ctx.pool, job, str(exc), retryable=False)
     except ShopifyAuthError as exc:
         log.error("store rejected our credentials: %s", exc, extra=extra)
         jobs.fail(ctx.pool, job, str(exc), retryable=False)
@@ -113,6 +114,12 @@ def run_job(ctx: AppContext, job: dict) -> None:
     except Exception as exc:  # noqa: BLE001 - the worker must outlive one bad job; it is recorded and logged
         log.exception("job failed", extra=extra)
         jobs.fail(ctx.pool, job, f"{type(exc).__name__}: {exc}")
+
+
+def _ever_connected_and_installed(ctx: AppContext) -> bool:
+    with tx(ctx.pool) as conn:
+        shop = conn.execute("SELECT installed_at, uninstalled_at FROM shops WHERE id = %s", (ctx.shop_id,)).fetchone()
+    return shop is not None and shop["installed_at"] is not None and shop["uninstalled_at"] is None
 
 
 def beat(ctx: AppContext) -> None:

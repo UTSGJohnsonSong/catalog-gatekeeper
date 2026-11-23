@@ -28,6 +28,10 @@ class ShopifyAuthError(ShopifyError):
     pass
 
 
+class WritesNotAllowed(ShopifyAuthError):
+    """This adapter must not write to this store. Raised before anything is sent."""
+
+
 class ShopifyGraphQLError(ShopifyError):
     pass
 
@@ -61,3 +65,7 @@ class ShopifyPort(Protocol):
     def update_product(
         self, gid: str, fields: Mapping[str, str], *, expected_content_hash: str | None = None
     ) -> UpdateResult: ...
+
+    def ensure_writable(self) -> None:
+        """Raises WritesNotAllowed when a write must not happen. Asked before a write is recorded as sent."""
+        ...

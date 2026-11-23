@@ -34,6 +34,7 @@ from gatekeeper.shopify.port import (
     ShopifyTransient,
     UpdateResult,
     UserError,
+    WritesNotAllowed,
 )
 
 log = logging.getLogger("gatekeeper.shopify")
@@ -284,11 +285,19 @@ class LiveShopify:
             return
         self._sleep((requested - available) / rate + random.uniform(0, 0.25))  # noqa: S311 - jitter, not security
 
+    def ensure_writable(self) -> None:
+        if not self._writes_enabled:
+            raise WritesNotAllowed("live writes are disabled (WRITEBACK_ENABLED is false)")
+        if self._development_store_only and not self._development_store():
+            raise WritesNotAllowed("template-drafted fixes are written only to development stores, and this is not one")
+
     def _development_store(self) -> bool:
-        """Asked once per process. A store does not turn into a development store, and only `true` counts."""
-        if self._is_development_store is None:
-            plan = (self._post("ShopPlan", QUERY_SHOP_PLAN, {}).get("shop") or {}).get("plan") or {}
-            self._is_development_store = plan.get("partnerDevelopment") is True
+        """Asked before every template write, because a development store handed over to a merchant stops being one,
+        and writes are few: a person approves each. Only a refusal is remembered. Anything but `true` counts as no."""
+        if self._is_development_store is False:
+            return False
+        plan = (self._post("ShopPlan", QUERY_SHOP_PLAN, {}).get("shop") or {}).get("plan") or {}
+        self._is_development_store = plan.get("partnerDevelopment") is True
         return self._is_development_store
 
     def list_products(
@@ -310,10 +319,7 @@ class LiveShopify:
     def update_product(
         self, gid: str, fields: Mapping[str, str], *, expected_content_hash: str | None = None
     ) -> UpdateResult:
-        if not self._writes_enabled:
-            raise ShopifyAuthError("live writes are disabled (WRITEBACK_ENABLED is false)")
-        if self._development_store_only and not self._development_store():
-            raise ShopifyAuthError("template-drafted fixes are written only to development stores, and this is not one")
+        self.ensure_writable()  # Asked again here, in case a caller skipped it.
         data = self._post("ProductUpdate", MUTATION_UPDATE, {"product": update_input(gid, dict(fields))})
         payload = data.get("productUpdate") or {}
         errors = [

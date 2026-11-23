@@ -11,7 +11,7 @@ function writingSentence(envOn: boolean, shopOn: boolean): string {
 export function SettingsPage() {
   const client = useQueryClient();
   const { data: meta, error } = useQuery({ queryKey: ["meta"], queryFn: api.meta });
-  const { data: me } = useQuery({ queryKey: ["whoami"], queryFn: api.whoami, retry: false });
+  const { data: me, error: meError } = useQuery({ queryKey: ["whoami"], queryFn: api.whoami, retry: false });
   const toggle = useMutation({
     mutationFn: (enabled: boolean) => api.setWriteback(enabled),
     onSuccess: () => client.invalidateQueries({ queryKey: ["meta"] }),
@@ -23,6 +23,9 @@ export function SettingsPage() {
     <Page heading="Settings">
       <s-stack gap="base">
         {error && <ErrorBanner>Could not load the settings: {error.message}</ErrorBanner>}
+        {meError && (
+          <ErrorBanner>Could not check your role, so the switch for writing is hidden: {meError.message}</ErrorBanner>
+        )}
         {meta && (
           <s-section heading="Writing to the store">
             <s-stack gap="base">
