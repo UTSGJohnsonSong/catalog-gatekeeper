@@ -1,29 +1,35 @@
-import { diffWords } from "diff";
 import { useEffect, useState } from "react";
-import { GateRun, type Check } from "./GateRun";
+import { Architecture } from "./Architecture";
+import {
+  AUDIT_RULES,
+  HARD_LIMITS,
+  MOVES,
+  STACK,
+  STATUS_DONE,
+  STATUS_NOT_DONE,
+  STORE_DATA,
+} from "./content";
+import { FixText, type Fix } from "./FixText";
+import { CHECK_NAMES, GateRun, type Check } from "./GateRun";
+import { Lane } from "./Lane";
 import sample from "./sample.json";
-
-type Fix = (typeof sample.fixes)[number];
 
 const DEMO_URL = "/app/";
 
-// Every figure below is copied from a report in eval/reports/, and Landing.test.tsx pins the copies. Change both
-// together: validators-test-20261101T014916Z.json, citations-test-20261101T014916Z.json,
+// Every figure in the numbers section is copied from a report in eval/reports/, and Landing.test.tsx pins the copies.
+// Change both together: validators-test-20261101T014916Z.json, citations-test-20261101T014916Z.json,
 // audit-test-20261101T015645Z.json (A13 and PASS_WITH_KNOWN_FAILURES), retrieval-test-20261101T014916Z.json and
 // agent-dev-20261102T095137Z.json.
 
-// Catalog text is shown as text, never as markup, as in the review screen.
-function FixText({ fix }: { fix: Fix }) {
-  return (
-    <p className="fix-text">
-      {diffWords(fix.before.join("\n"), fix.after.join("\n")).map((part, index) => {
-        if (part.added) return <ins key={index}>{part.value}</ins>;
-        if (part.removed) return <del key={index}>{part.value}</del>;
-        return <span key={index}>{part.value}</span>;
-      })}
-    </p>
-  );
-}
+const SECTIONS: { id: string; label: string }[] = [
+  { id: "how", label: "Start to finish" },
+  { id: "rules", label: "What it looks for" },
+  { id: "limits", label: "Hard limits" },
+  { id: "numbers", label: "Numbers" },
+  { id: "inside", label: "Inside" },
+  { id: "data", label: "Store data" },
+  { id: "status", label: "Status" },
+];
 
 function Docket({ fix, animate }: { fix: Fix; animate: boolean }) {
   const citation = fix.citations[0];
@@ -48,31 +54,6 @@ function Docket({ fix, animate }: { fix: Fix; animate: boolean }) {
   );
 }
 
-const STEPS: { name: string; text: string }[] = [
-  { name: "Sync", text: "Products come in from the store. A signed webhook only says that something changed, so the product is fetched again." },
-  {
-    name: "Audit",
-    text: "Thirteen rules flag problems such as thin or placeholder descriptions, missing search text, missing image alt text and phrases that look like instructions to a model.",
-  },
-  {
-    name: "Agent",
-    text: "A hosted LLM drafts a fix for one product at a time. Its tools are bound to that product, and a statement about store policy has to quote the policy. In the demo, a template script drafts the fixes instead.",
-  },
-  {
-    name: "Twelve checks",
-    text: "Deterministic validators decide. Eleven can stop a fix, and a stopped fix cannot be approved by anyone, admins included.",
-  },
-  {
-    name: "Judge",
-    text: "A second model call reads the fix. It can raise the risk score, but it cannot clear a check. The demo has no judge.",
-  },
-  { name: "A person", text: "The reviewer approves the exact change on screen. The approval is bound to a hash of that change." },
-  {
-    name: "Write-back",
-    text: "The worker writes, reads the product back and compares hashes before marking it written. If the merchant edited the product first, the fix is marked out of date instead of overwriting the newer text. On a live Shopify store a gap of about one round trip remains, because its update call takes no precondition.",
-  },
-];
-
 function useResetMinutes(): number | null {
   const [minutes, setMinutes] = useState<number | null>(null);
   useEffect(() => {
@@ -91,17 +72,28 @@ function useResetMinutes(): number | null {
 }
 
 export function Landing({ animate = true }: { animate?: boolean }) {
-  const [passed, stopped] = sample.fixes;
+  const [passed] = sample.fixes;
   const resetMinutes = useResetMinutes();
   return (
     <>
       <header className="masthead">
-        <a className="wordmark" href="/">
-          Catalog Gatekeeper
-        </a>
-        <a className="masthead-link" href={DEMO_URL}>
-          Open the demo
-        </a>
+        <div className="masthead-row">
+          <a className="wordmark" href="/">
+            Catalog Gatekeeper
+          </a>
+          <a className="masthead-link" href={DEMO_URL}>
+            Open the demo
+          </a>
+        </div>
+        <nav aria-label="On this page">
+          <ul className="section-nav" role="list">
+            {SECTIONS.map((section) => (
+              <li key={section.id}>
+                <a href={`#${section.id}`}>{section.label}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </header>
 
       <main>
@@ -125,30 +117,105 @@ export function Landing({ animate = true }: { animate?: boolean }) {
           <Docket fix={passed} animate={animate} />
         </section>
 
-        <section id="how" className="steps-section" aria-labelledby="how-title">
-          <h2 id="how-title">How a fix moves</h2>
-          <ol className="steps">
-            {STEPS.map((step) => (
-              <li key={step.name}>
-                <h3>{step.name}</h3>
-                <p>{step.text}</p>
-              </li>
-            ))}
-          </ol>
-          <div className="stopped">
-            <p className="stopped-lede">
-              The demo seeds a few products that make the template write a bad fix on purpose. Here it added a link, so V04
-              stopped it:
-            </p>
-            <p className="stopped-line">
-              <span className="catalog">{stopped.after[stopped.after.length - 1]}</span>
-            </p>
-            <GateRun checks={stopped.checks as Check[]} animate={false} />
+        <section id="how" className="section" aria-labelledby="how-title">
+          <h2 id="how-title">One product, start to finish</h2>
+          <p className="section-lede">
+            Follow one product through the seven steps: the {passed.product_title}, the first product in the simulated
+            store. Each snapshot shows its state at that step, copied from the store&apos;s seed data and from a demo run.
+          </p>
+          <Lane />
+        </section>
+
+        <section id="rules" className="section" aria-labelledby="rules-title">
+          <h2 id="rules-title">What it looks for</h2>
+          <p className="section-lede">
+            Thirteen audit rules look for defects in a product. Twelve validators then check every fix before a person
+            sees it. All of them are deterministic code, not model calls.
+          </p>
+          <div className="split">
+            <div>
+              <h3>Audit rules</h3>
+              <table className="rule-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Id</th>
+                    <th scope="col">Rule, and when it fires</th>
+                    <th scope="col">Severity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {AUDIT_RULES.map((rule) => (
+                    <tr key={rule.id}>
+                      <th scope="row">{rule.id}</th>
+                      <td>
+                        <span className="rule-name">{rule.name}</span>
+                        <span className="rule-when">{rule.when}</span>
+                      </td>
+                      <td>{rule.severity}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="table-note">The agent may draft fixes for A01 to A08. The other five are left to a person.</p>
+            </div>
+            <div className="docket checks-docket">
+              <h3>Checks on every fix</h3>
+              <ul className="check-list" role="list">
+                {Object.entries(CHECK_NAMES).map(([id, name]) => (
+                  <li key={id}>
+                    <span className="check-id">{id}</span> {name}
+                  </li>
+                ))}
+              </ul>
+              <p className="docket-note">
+                Every check runs on every fix, so the reviewer sees all the evidence. V10 only warns; the other eleven
+                stop the fix.
+              </p>
+            </div>
           </div>
         </section>
 
-        <section className="numbers-section" aria-labelledby="numbers-title">
-          <h2 id="numbers-title">What has been measured, and what has not</h2>
+        <section id="limits" className="section" aria-labelledby="limits-title">
+          <h2 id="limits-title">What it can never do</h2>
+          <p className="section-lede">
+            These limits are in the code and the database, so none of them depends on the model behaving well.
+          </p>
+          <div className="split">
+            <ul className="never-list" role="list">
+              {HARD_LIMITS.map((limit) => (
+                <li key={limit.lead}>
+                  <strong>{limit.lead}</strong> {limit.detail}
+                </li>
+              ))}
+            </ul>
+            <div className="docket moves">
+              <table className="moves-table">
+                <caption>How a fix can move</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">A fix that is</th>
+                    <th scope="col">Can become</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {MOVES.map((move) => (
+                    <tr key={move.from}>
+                      <th scope="row">{move.from}</th>
+                      <td>{move.to}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="docket-note">
+                A database trigger enforces these moves, keeps a fix&apos;s content from changing and writes one audit row
+                for each move.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section id="numbers" className="section numbers-section" aria-labelledby="numbers-title">
+          <h2 id="numbers-title">Measured, and not measured</h2>
           <p>
             The rules were measured on a frozen synthetic test split. The rules, the data and the tests share one author,
             so these numbers check the rules against their own specification. They do not show how the rules behave on a
@@ -198,7 +265,54 @@ export function Landing({ animate = true }: { animate?: boolean }) {
           </p>
         </section>
 
-        <section className="try-section" aria-labelledby="try-title">
+        <section id="inside" className="section" aria-labelledby="inside-title">
+          <h2 id="inside-title">Inside</h2>
+          <div className="split">
+            <p>
+              One container image runs three processes: the API, which also serves this page and the review screen; a
+              worker that takes jobs from a queue in Postgres; and an MCP server with read-only tools. Database migrations
+              run once, as a separate step.
+            </p>
+            <ul className="stack-list" role="list" aria-label="Stack">
+              {STACK.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+          <Architecture />
+        </section>
+
+        <section id="data" className="section" aria-labelledby="data-title">
+          <h2 id="data-title">Your store&apos;s data</h2>
+          {STORE_DATA.map((paragraph) => (
+            <p key={paragraph}>{paragraph}</p>
+          ))}
+        </section>
+
+        <section id="status" className="section" aria-labelledby="status-title">
+          <h2 id="status-title">Status</h2>
+          <p className="section-lede">What runs today, and what is not done yet.</p>
+          <div className="split">
+            <div>
+              <h3>Done</h3>
+              <ul className="status-list" role="list">
+                {STATUS_DONE.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3>Not done yet</h3>
+              <ul className="status-list" role="list">
+                {STATUS_NOT_DONE.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="section try-section" aria-labelledby="try-title">
           <h2 id="try-title">Try the review screen</h2>
           <p>
             Sign in with the token that is already filled in. Approve or reject a fix, then edit a product as the merchant

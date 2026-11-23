@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GateRun, outcome } from "./GateRun";
 import { Landing } from "./Landing";
+import store from "./product.json";
 import sample from "./sample.json";
 
 const passing = sample.fixes[0].checks;
@@ -104,5 +105,88 @@ describe("the landing page", () => {
     render(<Landing animate={false} />);
     await waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/meta"));
     expect(screen.queryByText(/share the same sandbox/)).toBeNull();
+  });
+});
+
+const ids = (prefix: string, count: number) =>
+  Array.from({ length: count }, (_, index) => `${prefix}${String(index + 1).padStart(2, "0")}`);
+
+describe("the product page", () => {
+  it("walks one product through the seven steps, in order", () => {
+    noMeta();
+    const { container } = render(<Landing animate={false} />);
+    const steps = [...container.querySelectorAll("#how .lane > li")];
+    expect(steps.map((step) => step.querySelector("h3")?.textContent)).toEqual([
+      "Sync",
+      "Audit",
+      "Agent",
+      "Twelve checks",
+      "Judge",
+      "A person",
+      "Write-back",
+    ]);
+    expect(steps.filter((step) => step.querySelector("figure.snap"))).toHaveLength(7);
+    // The lane is drawing only; screen readers get the numbered list and the snapshots.
+    expect(container.querySelectorAll('#how .lane-line[aria-hidden="true"]')).toHaveLength(7);
+  });
+
+  it("shows the product as the simulated store holds it and as the demo run left it", () => {
+    const [passed] = sample.fixes;
+    // product.json is copied from fixtures/shopify/catalog_demo.json, and it must agree with the captured fix.
+    expect(store.product.title).toBe(passed.product_title);
+    expect(store.product.description_html).toBe(`<p>${passed.before.join(" ")}</p>`);
+    expect(passed.findings.map((finding) => finding.rule_id)).toEqual(["A02"]);
+    noMeta();
+    const { container } = render(<Landing animate={false} />);
+    const lane = container.querySelector("#how .lane");
+    expect(lane).toHaveTextContent(store.product.seo_description);
+    expect(lane).toHaveTextContent("A02 Description is thin");
+    expect(lane).toHaveTextContent(`Cites ${passed.citations[0].chunk_id}`);
+    expect(lane).toHaveTextContent("The LLM judge did not run.");
+    expect(lane).toHaveTextContent("Needs review");
+    expect(container.querySelector("#how .stopped .gate-stopped")).toHaveTextContent("V04");
+  });
+
+  it("lists all 13 audit rules and all 12 checks", () => {
+    noMeta();
+    const { container } = render(<Landing animate={false} />);
+    const rules = [...container.querySelectorAll("#rules .rule-table tbody th")].map((cell) => cell.textContent);
+    expect(rules).toEqual(ids("A", 13));
+    const checks = [...container.querySelectorAll("#rules .check-id")].map((cell) => cell.textContent);
+    expect(checks).toEqual(ids("V", 12));
+  });
+
+  it("keeps the pinned figures in the numbers section, the failing rule included", () => {
+    noMeta();
+    const { container } = render(<Landing animate={false} />);
+    const numbers = container.querySelector("#numbers")?.textContent ?? "";
+    for (const figure of ["323 of 329", "323 of 330", "Two of 102 fixes that should have passed", "57 of 57", "0 of 25", "10 of 30", "2 of 8", "40 of 40", "None was blocked", "PASS_WITH_KNOWN_FAILURES"]) {
+      expect(numbers).toContain(figure);
+    }
+    expect(container.querySelector("#numbers .number-failed")).toHaveTextContent("rule A13");
+  });
+
+  it("names no model vendor anywhere, in text or in attributes", () => {
+    noMeta();
+    const { container } = render(<Landing animate={false} />);
+    expect(container.innerHTML).not.toMatch(/claude|anthropic/i);
+  });
+
+  it("links each masthead entry to a section of the page", () => {
+    noMeta();
+    const { container } = render(<Landing animate={false} />);
+    const targets = [...container.querySelectorAll("nav .section-nav a")].map((link) => link.getAttribute("href") ?? "");
+    expect(targets).toEqual(["#how", "#rules", "#limits", "#numbers", "#inside", "#data", "#status"]);
+    for (const target of targets) expect(container.querySelector(`section${target}`)).not.toBeNull();
+  });
+
+  it("draws the architecture as a labelled image coloured only by the stylesheet", () => {
+    noMeta();
+    const { container } = render(<Landing animate={false} />);
+    const svg = container.querySelector(".arch svg");
+    expect(svg).toHaveAttribute("role", "img");
+    expect(svg?.getAttribute("aria-label")).toMatch(/12 validators/);
+    // Colours come from CSS variables, so the drawing follows the dark theme.
+    expect(svg?.querySelectorAll("[fill], [stroke], [style]")).toHaveLength(0);
   });
 });

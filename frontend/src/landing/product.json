@@ -1,0 +1,17 @@
+{
+  "source": "Copied from fixtures/shopify/catalog_demo.json, the seed data of the simulated store: gid://shopify/Product/1000 as the store holds it before any fix. Only the fields the page shows are copied.",
+  "product": {
+    "gid": "gid://shopify/Product/1000",
+    "title": "Trailhead Daypack 20L",
+    "vendor": "Northline",
+    "product_type": "Bags",
+    "description_html": "<p>Nice bags item.</p>",
+    "seo_title": "Trailhead Daypack 20L | Northline",
+    "seo_description": "Trailhead Daypack 20L from Northline, part of our bags range.",
+    "variants": [
+      { "sku": "TRAILH-0", "price": "64.00", "options": ["Slate"] },
+      { "sku": "TRAILH-1", "price": "64.00", "options": ["Moss"] }
+    ],
+    "images": [{ "alt": "Trailhead Daypack 20L on a plain background" }]
+  }
+}
