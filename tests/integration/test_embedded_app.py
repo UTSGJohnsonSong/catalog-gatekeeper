@@ -7,6 +7,7 @@ import base64
 import json
 import threading
 import time
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -17,7 +18,7 @@ from gatekeeper import jobs
 from gatekeeper.agent.loop import run_agent
 from gatekeeper.api.app import create_app
 from gatekeeper.config import decode_key
-from gatekeeper.context import AppContext, ensure_shop
+from gatekeeper.context import AppContext, build_shopify, ensure_shop
 from gatekeeper.db import tx
 from gatekeeper.llm.heuristic import HeuristicProvider
 from gatekeeper.services import shop_lifecycle
@@ -339,3 +340,14 @@ def test_a_session_token_shopify_refuses_asks_app_bridge_to_retry(ectx, eclient,
     assert response.status_code == 401
     assert response.headers["x-shopify-retry-invalid-session-request"] == "1"
     assert stored(ectx) is None
+
+
+def test_a_scheduled_sync_before_the_first_open_is_skipped_not_failed(ectx):
+    # The real wiring: a live adapter whose token source has nothing stored yet. It fails before any HTTP call.
+    live = replace(
+        ectx, shopify=build_shopify(ectx.settings, ectx.pool, shop_id=ectx.shop_id, store_auth=ectx.store_auth)
+    )
+    jobs.enqueue(ectx.pool, "sync", {})
+    drain(live)
+    with ectx.pool.connection() as conn:
+        assert [r["status"] for r in conn.execute("SELECT status FROM jobs WHERE kind = 'sync'").fetchall()] == ["done"]

@@ -1,0 +1,5 @@
+# Findings checked by hand and known not to be secrets. Each line is gitleaks' fingerprint: commit:file:rule:line.
+#
+# A test-only AES key, base64 of the bytes 1 to 32, written out in an early commit on the branch feat/embedded-app.
+# It never encrypted anything outside a test database. The tests now compute it at run time.
+5a56657acf3a6668505933b432204481543f6e59:tests/integration/test_embedded_app.py:generic-api-key:40

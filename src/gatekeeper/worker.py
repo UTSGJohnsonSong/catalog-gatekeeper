@@ -20,6 +20,7 @@ from gatekeeper.llm.port import LLMError
 from gatekeeper.services.sync import sync_catalog
 from gatekeeper.services.webhooks import process_event
 from gatekeeper.services.writeback import apply_proposal
+from gatekeeper.shopify.offline_tokens import ShopNotConnected
 from gatekeeper.shopify.port import ShopifyAuthError, ShopifyError, ShopifyThrottled
 
 log = logging.getLogger("gatekeeper.worker")
@@ -88,6 +89,15 @@ def run_job(ctx: AppContext, job: dict) -> None:
     except ShopifyThrottled as exc:
         log.warning("store throttled the request", extra=extra)
         jobs.defer(ctx.pool, job_id, max(1, int(exc.retry_after) + 1), "throttled")
+    except ShopNotConnected as exc:
+        if kind != "sync":
+            log.error("%s", exc, extra=extra)
+            jobs.fail(ctx.pool, job, str(exc), retryable=False)
+            return
+        # A scheduled sync before the first open, or after an uninstall, has nothing to read. That is not a failure,
+        # and the next connection queues a sync of its own.
+        log.warning("sync skipped: %s", exc, extra=extra)
+        jobs.complete(ctx.pool, job_id)
     except ShopifyAuthError as exc:
         log.error("store rejected our credentials: %s", exc, extra=extra)
         jobs.fail(ctx.pool, job, str(exc), retryable=False)
