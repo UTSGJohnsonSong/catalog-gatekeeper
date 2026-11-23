@@ -57,8 +57,8 @@ def checkout_pages_branch() -> None:
 
 
 def assemble() -> None:
-    # Files the previous publish left are taken out of the branch's next commit. History keeps them.
-    run("git", "rm", "-r", "-q", "--ignore-unmatch", ".", cwd=WORKTREE)
+    # Files the previous publish left, committed or only staged, are taken out of the next commit. History keeps them.
+    run("git", "rm", "-r", "-q", "-f", "--ignore-unmatch", ".", cwd=WORKTREE)
     for name in PUBLISHED:
         source = DIST / name
         if source.is_dir():
