@@ -105,9 +105,10 @@ export function Landing({ animate = true }: { animate?: boolean }) {
           <div className="hero-copy">
             <h1 id="hero-title">An agent proposes. Twelve checks and a person decide.</h1>
             <p className="lede">
-              Catalog Gatekeeper audits a Shopify-style product catalog and lets a hosted LLM propose fixes. Every fix
-              must clear a gate of deterministic checks, then waits for a reviewer to approve the exact change. It is a
-              personal project, built on synthetic data and a simulated store.
+              Catalog Gatekeeper audits a Shopify-style product catalog and is built for a hosted LLM to propose fixes;
+              in the demo, a template script drafts them instead. Every fix must clear a gate of deterministic checks,
+              then waits for a reviewer to approve the exact change. It is a personal project, built on synthetic data
+              and a simulated store.
             </p>
             <p className="actions">
               <a className="button button-primary" href={DEMO_URL}>
