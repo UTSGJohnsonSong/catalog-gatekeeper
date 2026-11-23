@@ -13,18 +13,39 @@ its own Content-Security-Policy (`src/gatekeeper/api/app.py`): the landing page 
 
 ## Landing page
 
-**Job.** A recruiter or reviewer understands in 30 seconds what this is and why to trust it, then opens the demo.
+On 2026-11-23 the page grew into one long product page, built from a design the owner approved that day.
 
-- Palette and type: the table and the two type voices below, light and dark.
-- Layout: one left-aligned column of about 68 characters. On wide screens the docket panel reaches right of it.
-  Four parts: a real fix before and after, the seven steps a fix moves through (numbered, because they are a
-  sequence), the measured numbers with their limits, and the way into the demo.
-- Signature: the gate run. On load, one real fix from the demo lights the 12 checks in order and stops at "Waiting
-  for a person to approve". It runs once. With reduced motion the finished state shows at once, and screen readers
-  get the result as one sentence. On a phone the 12 checks become a 4 by 3 grid.
-- The fixes shown are copied from a demo run into `frontend/src/landing/sample.json`, which says where they came
-  from. The figures are copied from the eval reports named in `Landing.tsx`, the failing rule A13 included. A test
-  pins the copies but does not read the reports, so change both together.
+**Job.** A recruiter or reviewer understands in 30 seconds what this is and why to trust it. Whoever reads on finds
+every part of the product explained, then opens the demo.
+
+- Palette and type: the table and the two type voices below, light and dark, with no new hues. Both faces are
+  bundled. The page's Content-Security-Policy allows no other origin, so it loads no outside fonts, scripts or images.
+- Layout: one left-aligned reading column of about 68 characters. From 1040px wide a docket column sits to its
+  right. The copy column is 31rem in every section, so the hero docket, the lane and the side panels share one left
+  edge.
+- Sections, in order: the hero and its docket; "One product, start to finish"; "What it looks for" (A01 to A13 in a
+  table, V01 to V12 in a docket); "What it can never do" (the hard limits, beside the table of moves a fix can make);
+  "Measured, and not measured" (the numbers, word for word as before); "Inside" (the stack and a diagram); "Your
+  store's data"; "Status"; the way into the demo; the footer. The masthead links to each section and wraps on a phone.
+- Signature: the lane. One real product, the Trailhead Daypack 20L, walks the seven steps, numbered because they
+  are a sequence. Beside each step a snapshot of that product's state hangs from one thin harbour line, like a docket
+  moving down an inspection lane. On a phone each snapshot sits under its step, the lane runs down the left edge, and
+  the step numbers sit on it. The lane is decoration and hidden from screen readers; the snapshots are real text.
+  The fix was captured while it waited for review, so the snapshots for the last two steps say what happens next
+  instead of showing a result. The stopped V04 example sits beside the twelve checks.
+- The gate run in the hero stays the only motion that plays by itself. On load, one real fix lights the 12 checks in
+  order and stops at "Waiting for a person to approve". It runs once. With reduced motion the finished state shows at
+  once, and screen readers get the result as one sentence. On a phone the 12 checks become a 4 by 3 grid.
+- The architecture diagram is inline SVG drawn from `docs/ARCHITECTURE.md`. It keeps its natural size, so no label is
+  under 12px, and its colours come from the page's CSS variables, so it follows the dark theme. On a narrow screen it
+  scrolls sideways inside its own frame, never the page. The thicker outlines mark the two places that decide.
+- Sources. The fixes are copied from a demo run into `frontend/src/landing/sample.json`. The store's copy of the
+  product is copied from `fixtures/shopify/catalog_demo.json` into `frontend/src/landing/product.json`. The figures
+  are copied from the eval reports named in `Landing.tsx`, the failing rule A13 included. The longer copy is in
+  `frontend/src/landing/content.ts`, which names the documents it follows. Tests pin the copies but do not read the
+  sources, because the Docker build sees only `frontend/`, so change both together.
+- Checked against the generic defaults: no all-caps eyebrows, no middle-dot meta strings, no arrows on buttons, no
+  rows of identical shadowed cards, no gradients, no emoji, and numbers only on the seven steps.
 
 ## Review UI on Polaris
 
