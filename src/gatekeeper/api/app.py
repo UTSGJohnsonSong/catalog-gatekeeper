@@ -561,11 +561,15 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
         def spa(path: str) -> Response:
             if path.startswith(("api/", "webhooks/", "demo/")):
                 raise HTTPException(404)
-            # Two pages: the review app owns /app and everything under it, the landing page answers the rest.
+            # The review app owns /app and everything under it, the privacy page is /privacy/, and the landing page
+            # answers the rest.
             if is_review_app_path(f"/{path}"):
                 if embedded_page is not None:
                     return HTMLResponse(embedded_page)
                 return FileResponse(review_page)
+            privacy_page = Path(static) / "privacy" / "index.html"
+            if path.rstrip("/") == "privacy" and privacy_page.is_file():
+                return FileResponse(privacy_page)
             return FileResponse(Path(static) / "index.html")
 
     return app

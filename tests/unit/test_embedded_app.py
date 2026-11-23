@@ -382,6 +382,8 @@ def static_site(tmp_path: Path) -> Path:
     (tmp_path / "app").mkdir()
     (tmp_path / "index.html").write_text("<!doctype html><html><head></head><body>landing</body></html>")
     (tmp_path / "app" / "index.html").write_text(REVIEW_HTML)
+    (tmp_path / "privacy").mkdir()
+    (tmp_path / "privacy" / "index.html").write_text("<!doctype html><html><head></head><body>privacy</body></html>")
     return tmp_path
 
 
@@ -451,3 +453,12 @@ def test_the_embedded_service_boots_with_its_blueprint_values():
     }
     settings = Settings(**values, **entered)  # type: ignore[arg-type]
     assert settings.env == "production" and settings.shopify_embedded and settings.uses_template_model
+
+
+def test_the_privacy_page_is_served_without_the_api_and_cannot_be_framed(tmp_path):
+    settings = embedded_settings(static_dir=static_site(tmp_path))
+    with TestClient(create_app(settings, ctx=SimpleNamespace())) as client:  # type: ignore[arg-type]
+        for path in ("/privacy", "/privacy/"):
+            page = client.get(path)
+            assert page.status_code == 200 and "privacy" in page.text
+            assert page.headers["x-frame-options"] == "DENY"

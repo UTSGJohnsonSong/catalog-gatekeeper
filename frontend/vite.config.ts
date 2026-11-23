@@ -23,6 +23,8 @@ export default defineConfig({
       input: {
         landing: fileURLToPath(new URL("./index.html", import.meta.url)),
         app: fileURLToPath(new URL("./app/index.html", import.meta.url)),
+        // Static, like the landing page: a store's privacy policy must open without the API.
+        privacy: fileURLToPath(new URL("./privacy/index.html", import.meta.url)),
       },
     },
   },
