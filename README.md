@@ -2,7 +2,9 @@
 
 An AI agent that audits and repairs a Shopify product catalog. Its store adapter speaks the Admin GraphQL API, version 2026-10. It proposes fixes, cites the store policy it relied on, passes every proposal through checks a program can verify, queues it for a person, and only then writes back.
 
-**Why it exists.** An LLM can write a good product description, and it can also invent a warranty or follow an instruction hidden in a supplier's text. The interesting problem is what stands between the model and the store. Here that is a narrow tool surface, 12 deterministic checks, citations checked word for word, a person approving an exact diff, and a write-back that refuses to overwrite a merchant's newer edit.
+Live demo: https://catalog-gatekeeper-demo.onrender.com. It sleeps when idle, so the first visit can take about a minute.
+
+**Why it exists.** An LLM can write a good product description, and it can also invent a warranty or follow an instruction hidden in a supplier's text. The interesting problem is what stands between the model and the store. Here that is a narrow tool surface, 12 deterministic checks (11 of them can stop a fix), citations checked word for word, a person approving an exact diff, and a write-back that refuses to overwrite a merchant's newer edit.
 
 **The demo runs with no account and no key, so two parts are simulated.** The store is a fixture, and the model is a template script, not an LLM. The eval data is synthetic. A real model has run once, on 40 synthetic products, through the eval rather than the demo. The live store adapter and the embedded mode, which opens the review screen inside a store's Shopify admin, are tested against mocked Shopify HTTP and real Postgres; neither has run against a real store yet. See the table below.
 
@@ -20,9 +22,9 @@ python scripts/smoke.py
 
 That drives the same flow over HTTP against the running stack.
 
-To put the same demo on the internet for free, see `docs/DEPLOY_DEMO.md`: one container on Render's free plan and a
-free Neon database, in a public mode with rate limits, a reviewer-only token and periodic resets. It is rehearsed
-locally and not deployed yet.
+The same demo runs on the internet for free at https://catalog-gatekeeper-demo.onrender.com: one container on Render's free plan and a free
+Neon database, in a public mode with rate limits, a reviewer-only token and periodic resets. `docs/DEPLOY_DEMO.md`
+has the setup and the latest check against the live service.
 
 ## What is real and what is not
 
@@ -36,7 +38,7 @@ locally and not deployed yet.
 | CI workflow | **Ran on GitHub.** On 2026-11-23 a manual run passed all seven jobs, gitleaks over the whole history included. Pushes that contain the root commit still fail `security`, because gitleaks cannot resolve its parent |
 | Hosted LLM provider and judge | **Ran for real, once**, on the dev split: 120 agent calls and 40 judge calls to a hosted LLM |
 | Agent behaviour, cost, latency | **Measured once on 40 synthetic products** (see Results). Repair quality has no automatic score. The policy search and citation path was never used by the real model |
-| Free public demo (one container, Render and Neon) | **Rehearsed locally, not deployed.** `docker-compose.public.yml` with `scripts/smoke_public.py` passed on 2026-11-03 and again on 2026-11-04 with the Polaris UI and the landing page; output in `eval/reports/checks-2026-11-04/` |
+| Free public demo (one container, Render and Neon) | **Online** at https://catalog-gatekeeper-demo.onrender.com. Run against it on 2026-11-24, `scripts/smoke_public.py` passed 12 of its 13 checks; the per-visitor rate limit did not trigger behind Render's proxy, output in `eval/reports/checks-2026-11-24/`. Before that, `docker-compose.public.yml` with the same script passed locally on 2026-11-03 and again on 2026-11-04 with the Polaris UI and the landing page; output in `eval/reports/checks-2026-11-04/` |
 | Live Shopify adapter | **Written, not run.** Tested against a mocked GraphQL server only, token renewal included. It has never called a store |
 | Embedded mode: App Bridge session tokens, token exchange for expiring offline tokens, the privacy webhooks | **Written, not run in a store.** Tested against mocked Shopify HTTP and real Postgres (`tests/integration/test_embedded_app.py`), including the refresh race between the API and the worker, with two token sources on separate connections, and a webhook forged from a session token. Steps in `docs/EMBEDDED.md` |
 | Terraform for ECS and RDS | **Validated with `terraform validate`, never applied** |

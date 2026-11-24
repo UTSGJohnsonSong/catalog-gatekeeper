@@ -1,7 +1,10 @@
 # Free public demo
 
-State on 2026-11-04: **prepared and rehearsed locally, not deployed.** Deploying needs two free accounts that only
-the owner can create. The rehearsal was repeated on 2026-11-04 with the Polaris review UI and the landing page.
+State on 2026-11-24: **online** at https://catalog-gatekeeper-demo.onrender.com. Run against it, `scripts/smoke_public.py` passed 12 of its 13
+checks. The one that failed is the per-visitor rate limit: 30 refused admin calls in a row never got a 429, so
+`TRUSTED_PROXY_HOPS` still has to be checked against Render's proxy, as "Check the client address" below
+describes. Output in `eval/reports/checks-2026-11-24/`. Before deployment the demo was rehearsed locally on
+2026-11-03 and again on 2026-11-04 with the Polaris review UI and the landing page.
 
 The layout is one container on Render's free plan and one free Neon Postgres. Prices and limits below were read on
 2026-11-03 from [Render](https://render.com/docs/free) and [Neon](https://neon.com/pricing). Check both pages again
