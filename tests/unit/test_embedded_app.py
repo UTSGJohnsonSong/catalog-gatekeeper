@@ -88,8 +88,8 @@ def test_a_valid_session_token_names_the_store_and_the_user():
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"exp": int(time.time()) - 60},  # expired beyond the leeway
-        {"nbf": int(time.time()) + 60},  # not valid yet
+        {"exp": lambda now: now - 60},  # expired beyond the leeway
+        {"nbf": lambda now: now + 60},  # not valid yet
         {"aud": "another-app"},
         {"_secret": "a-different-secret-" * 4},  # signed by someone else
         {"_alg": "HS512"},  # only HS256 is accepted
@@ -101,8 +101,12 @@ def test_a_valid_session_token_names_the_store_and_the_user():
     ],
 )
 def test_session_tokens_that_must_be_refused(overrides):
+    # Times are taken when the test runs, not when pytest collects it: the whole suite can outlast the 10 s leeway,
+    # and a not-before 60 s after collection would then be valid already.
+    now = int(time.time())
+    claims = {key: value(now) if callable(value) else value for key, value in overrides.items()}
     with pytest.raises(session_token.InvalidSessionToken):
-        verify(make_session_token(**overrides))
+        verify(make_session_token(**claims))
 
 
 def test_an_unsigned_token_is_refused():
