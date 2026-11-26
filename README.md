@@ -2,6 +2,8 @@
 
 An AI agent that audits and repairs a Shopify product catalog. Its store adapter speaks the Admin GraphQL API, version 2026-10. It proposes fixes, cites the store policy it relied on, passes every proposal through checks a program can verify, queues it for a person, and only then writes back.
 
+Product page: https://utsgjohnsonsong.github.io/catalog-gatekeeper/. It walks one product through the whole flow.
+
 Live demo: https://catalog-gatekeeper-demo.onrender.com. It sleeps when idle, so the first visit can take about a minute.
 
 **Why it exists.** An LLM can write a good product description, and it can also invent a warranty or follow an instruction hidden in a supplier's text. The interesting problem is what stands between the model and the store. Here that is a narrow tool surface, 12 deterministic checks (11 of them can stop a fix), citations checked word for word, a person approving an exact diff, and a write-back that refuses to overwrite a merchant's newer edit.
