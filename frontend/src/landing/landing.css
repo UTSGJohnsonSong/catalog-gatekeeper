@@ -1,5 +1,6 @@
 /* Landing page. The palette and the two type voices are the project's own, from docs/DESIGN.md: Newsreader speaks
-   for the catalog, Familjen Grotesk for the system. The one moving part is the gate run in the hero docket. */
+   for the catalog, Familjen Grotesk for the system. Each section is one figure the visitor can operate. The one thing
+   that moves by itself is the run of twelve lights in the hero's gate. */
 :root {
   --paper: #edf1f3;
   --surface: #f8fafb;
@@ -13,16 +14,17 @@
   --stopped-wash: #f8dfe4;
   --hold: #94600a;
   --on-primary: #ffffff;
+  /* Fills of the meter bars, and nothing else. In the dark theme --harbour and --stopped are too light to work as
+     bars, so the bars have their own pair; text and icons keep the tokens above. */
+  --meter: #24508f;
+  --meter-stopped: #ae2640;
   --system: "Familjen Grotesk Variable", "Segoe UI", system-ui, sans-serif;
   --catalog: "Newsreader Variable", Georgia, serif;
   color-scheme: light;
 
-  /* Layout. On wide screens a copy column and a docket column; the lane runs down the docket column's left edge,
-     and each snapshot hangs from it at --hook below its top. */
+  /* Layout. On wide screens a copy column and a docket column, shared by every section that splits in two. */
   --read-col: 31rem;
   --col-gap: 4.5rem;
-  --hang: 1.75rem;
-  --hook: 1.1rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -39,11 +41,15 @@
     --stopped-wash: #47202b;
     --hold: #e0b060;
     --on-primary: #10192a;
+    --meter: #5f93e4;
+    --meter-stopped: #e5607a;
     color-scheme: dark;
   }
 }
 
 * { box-sizing: border-box; }
+/* Panels and readouts are switched with the hidden attribute, which has to win over the display values set below. */
+[hidden] { display: none !important; }
 
 body {
   margin: 0;
@@ -54,8 +60,9 @@ body {
 }
 
 a { color: var(--harbour); }
+button { font: inherit; color: inherit; }
+figure { margin: 0; }
 :focus-visible { outline: 2px solid var(--harbour); outline-offset: 3px; }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 .masthead,
 main,
@@ -92,70 +99,174 @@ main,
 h1, h2 { font-family: var(--catalog); font-weight: 500; letter-spacing: -0.01em; }
 h1 { font-size: clamp(2.4rem, 5.2vw, 3.7rem); line-height: 1.06; margin: 0 0 1.25rem; }
 h2 { font-size: clamp(1.7rem, 3vw, 2.2rem); line-height: 1.15; margin: 0 0 1.25rem; }
-h3 { font-size: 1rem; font-weight: 650; margin: 0 0 0.15rem; }
+h3 { font-size: 1rem; font-weight: 650; margin: 0 0 0.4rem; }
 p { margin: 0 0 1rem; max-width: 68ch; }
 
+/* Anything that came from a product or a policy document speaks in the catalog's face. */
+.catalog { font-family: var(--catalog); font-size: 1.06em; }
+
 .button {
-  display: inline-block;
-  padding: 0.6rem 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.5rem 1.1rem;
   border: 1px solid var(--ink-soft);
   border-radius: 3px;
+  background: none;
   color: var(--ink);
   font-weight: 600;
   text-decoration: none;
+  cursor: pointer;
 }
 .button:hover { background: var(--surface); }
 .button-primary { background: var(--harbour); border-color: var(--harbour); color: var(--on-primary); }
 .button-primary:hover { background: var(--harbour); filter: brightness(1.1); }
+.button[aria-disabled="true"] { border-color: var(--line); color: var(--ink-soft); cursor: default; }
+.button[aria-disabled="true"]:hover { background: none; }
 .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.75rem; }
 
-/* Hero: the copy holds a reading column; the docket reaches right on wide screens. */
+/* A short label beside the thing it qualifies: where a value comes from, or what kind of thing a line is. */
+.tags { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.tag {
+  display: inline-block;
+  padding: 0 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--ink-soft);
+  font: 500 0.8rem/1.5 var(--system);
+  white-space: nowrap;
+}
+
+.icon {
+  flex: none;
+  width: 1.1em;
+  height: 1.1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icon-dashed { stroke-dasharray: 3 3; }
+
+/* An explanation one tap away. The marker is drawn here, so it is the same plus and minus in every browser. */
+summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  padding: 0.6rem 0;
+  line-height: 1.4;
+  list-style: none;
+  cursor: pointer;
+}
+summary::-webkit-details-marker { display: none; }
+summary::after { content: "+"; margin-left: auto; color: var(--harbour); font-weight: 700; }
+details[open] > summary::after { content: "\2212"; }
+details > p { margin: 0 0 0.9rem; font-size: 0.93rem; color: var(--ink-soft); }
+
+/* The line under a drawing that says what the chosen part does. It holds the height of two lines, so going from one
+   part to the next rarely moves what follows. */
+.readout p { min-height: 3.2em; margin: 0.9rem 0 0; }
+
+/* Hero: the copy holds a reading column; the gate reaches right on wide screens. */
 .hero {
   display: grid;
   gap: 2.5rem;
-  padding-block: 2.5rem 4.5rem;
+  padding-block: 2.5rem 4rem;
   align-items: start;
 }
 .lede { font-size: 1.12rem; color: var(--ink-soft); }
 
-@media (min-width: 1040px) {
-  .hero { grid-template-columns: minmax(0, var(--read-col)) minmax(0, 1fr); gap: var(--col-gap); padding-top: 4rem; }
-}
-
 .docket {
-  margin: 0;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 1.5rem 1.5rem 1.25rem;
+  padding: 1.5rem;
 }
-.docket-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.25rem 1rem; }
-.docket-product { font: 500 1.45rem/1.2 var(--catalog); margin: 0; }
-.docket-field { font-size: 0.88rem; color: var(--ink-soft); margin: 0; }
-.fix-text {
-  font: 400 1.12rem/1.65 var(--catalog);
-  white-space: pre-line;
-  margin: 1rem 0;
-  max-width: none;
-}
-ins { background: var(--cleared-wash); color: inherit; text-decoration: underline 1px var(--cleared); text-underline-offset: 3px; }
-del { background: var(--stopped-wash); color: inherit; text-decoration: line-through 1px var(--stopped); }
-.docket-note { font-size: 0.9rem; color: var(--ink-soft); }
-.docket figcaption { font-size: 0.82rem; color: var(--ink-soft); margin-top: 0.75rem; }
 
-/* The gate run. Twelve bars in a fixed order; a stopped check is taller and wider, so shape carries it too. */
-.gate-run { border-top: 1px solid var(--line); padding-top: 1rem; }
-.gates {
+/* The gate. A product's proposed description on ruled lines, four things a bad fix might try, and the twelve checks. */
+.gate { scroll-margin-top: 1rem; }
+.gate > figcaption { margin-top: 0.75rem; max-width: 62ch; font-size: 0.86rem; color: var(--ink-soft); }
+.gate-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.4rem 1rem;
+}
+.gate-product { margin: 0; font: 500 1.45rem/1.2 var(--catalog); }
+
+.gate-lines { list-style: none; margin: 0.75rem 0 0; padding: 0; font: 400 1.1rem/1.5 var(--catalog); }
+.gate-line {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.3rem 0 0.3rem 1.1rem;
+  border-bottom: 1px solid var(--line);
+}
+/* A line the visitor added: a plus in the margin and the word "added", not the green of a passed check. */
+.gate-line ins { text-decoration: none; }
+.gate-line-added::before {
+  content: "+";
+  position: absolute;
+  top: 0.3rem;
+  left: 0;
+  color: var(--hold);
+  font: 700 1.05rem/1.55 var(--system);
+}
+/* A line not added yet keeps the room its text will need, and shows as a blank ruled line. */
+.gate-line-empty { border-bottom-style: dashed; }
+.gate-line-empty > * { visibility: hidden; }
+/* What a check found, marked where it stands in the line. The underline carries it without the colour. */
+.gate-line mark {
+  background: var(--stopped-wash);
+  color: inherit;
+  text-decoration: underline 2px var(--stopped);
+  text-underline-offset: 3px;
+}
+
+.gate-ask { margin-top: 1.1rem; }
+.gate-prompt { margin: 0 0 0.55rem; font-weight: 650; }
+.gate-toggles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--ink-soft);
+  border-radius: 3px;
+  background: var(--paper);
+  font-weight: 550;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+}
+.toggle:hover { border-color: var(--ink); }
+.toggle[aria-pressed="true"] { background: var(--harbour); border-color: var(--harbour); color: var(--on-primary); }
+
+.gate-run { margin-top: 1.1rem; padding-top: 0.6rem; border-top: 1px solid var(--line); }
+/* Room for the result, so the card keeps its height while a run plays. */
+.gate-verdict { min-height: 1.6em; margin-top: 0.9rem; }
+
+/* A row of bars in a fixed order: the twelve checks, or the thirteen audit rules. A stopped bar is taller and wider,
+   so shape carries it as well as colour. The top padding is the room a taller bar grows into. */
+.lights {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0.75rem 0 0;
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 0.4rem;
   align-items: end;
 }
-.gate { display: grid; justify-items: center; gap: 0.3rem; }
-.gate-bar {
+.light { display: grid; justify-items: center; gap: 0.3rem; }
+.light-bar {
   width: 0.7rem;
   height: 2.4rem;
   border-radius: 1px;
@@ -163,110 +274,113 @@ del { background: var(--stopped-wash); color: inherit; text-decoration: line-thr
   transform-origin: bottom;
   transition: background-color 180ms ease-out, transform 180ms ease-out;
 }
-.gate-passed .gate-bar { background: var(--cleared); }
-.gate-warned .gate-bar { background: var(--hold); transform: scaleY(1.15); }
-.gate-stopped .gate-bar { background: var(--stopped); width: 1rem; transform: scaleY(1.3); }
-.gate-id { font-size: 0.72rem; color: var(--ink-soft); }
-.gate-stopped .gate-id { color: var(--stopped); font-weight: 700; }
-.gate-caption { margin: 0.9rem 0 0; font-size: 0.95rem; color: var(--ink-soft); min-height: 1.6em; }
-.gate-caption-done { color: var(--hold); font-weight: 650; }
+.light-passed .light-bar { background: var(--cleared); }
+.light-flagged .light-bar { background: var(--hold); transform: scaleY(1.15); }
+.light-stopped .light-bar { background: var(--stopped); width: 1rem; transform: scaleY(1.3); }
+.light-id { font-size: 0.72rem; color: var(--ink-soft); }
+.light-flagged .light-id,
+.light-stopped .light-id { color: var(--ink); font-weight: 700; }
+
+/* The result in words. The icon repeats the first word, in the colour of the bars. */
+.verdict { display: flex; align-items: flex-start; gap: 0.45rem; margin: 0; max-width: none; font-weight: 650; }
+.verdict .icon { margin-top: 0.22em; }
+.verdict-cleared .icon { color: var(--cleared); }
+.verdict-stopped .icon { color: var(--stopped); }
+.verdict-stops {
+  list-style: none;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.94rem;
+  line-height: 1.45;
+}
+.check-id { font-weight: 700; }
 
 /* Sections after the hero. On wide screens a section can split into the copy column and the docket column. */
 .section { padding-block: 3.25rem; border-top: 1px solid var(--line); }
+.section > h2 { margin-bottom: 1.5rem; }
 section[id] { scroll-margin-top: 1rem; }
-.section-lede { font-size: 1.05rem; color: var(--ink-soft); margin-bottom: 2rem; }
-.split { display: grid; gap: 2rem; align-items: start; }
-.split > * { max-width: 68ch; }
-.split h3 { margin-bottom: 0.75rem; }
+.split,
+.steps-panel { display: grid; gap: 2rem; align-items: start; }
+.note { font-size: 0.9rem; color: var(--ink-soft); }
 
-@media (min-width: 1040px) {
-  .split { grid-template-columns: minmax(0, var(--read-col)) minmax(0, 1fr); column-gap: var(--col-gap); }
-}
-
-/* One product, start to finish. The steps are numbered because they are a sequence. The lane is one harbour line,
-   drawn as a segment per step so it stays continuous whatever each step's height; it is decoration only. Narrow:
-   the lane runs down the left edge and the numbers sit on it. Wide: it runs down the docket column. */
-.lane { list-style: none; margin: 0; padding: 0; counter-reset: step; }
-.lane-step {
-  counter-increment: step;
+/* One product, seven steps. The lane is one line with seven numbered stops, numbered because they are a sequence.
+   The stops are the tabs; the line is harbour blue as far as the chosen step. */
+.steps-bar { display: grid; gap: 0.75rem; }
+.steps-lane { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); counter-reset: stop; }
+.stop {
+  counter-increment: stop;
   position: relative;
-  padding: 0 0 2.75rem calc(0.75rem + var(--hang));
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  gap: 0.3rem;
+  min-height: 2.75rem;
+  padding: 0.35rem 0.5rem 0.35rem 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
 }
-.lane-step:last-child { padding-bottom: 0; }
-.lane-line { position: absolute; top: 0; bottom: 0; left: 0.75rem; width: 2px; background: var(--harbour); }
-.lane-step:first-child .lane-line { top: 0.8rem; }
-.lane-text { max-width: 68ch; }
-.lane-text::before {
-  content: counter(step);
-  position: absolute;
-  top: 1px;
-  left: 1px;
-  width: 1.5rem;
-  height: 1.5rem;
-  border: 2px solid var(--harbour);
+.stop:hover { color: var(--ink); }
+.stop::before {
+  content: counter(stop);
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 2px solid var(--ink-soft);
   border-radius: 3px;
   background: var(--paper);
-  color: var(--harbour);
-  font: 700 0.8rem/calc(1.5rem - 4px) var(--system);
-  text-align: center;
+  font: 700 0.85rem/1 var(--system);
 }
-.lane-text p { margin: 0; }
-.lane-stop { margin-top: 1rem; }
-.lane-aside { margin-top: 1.25rem; }
-
-@media (min-width: 1040px) {
-  .lane-step {
-    display: grid;
-    grid-template-columns: minmax(0, var(--read-col)) minmax(0, 1fr);
-    grid-template-rows: auto 1fr;
-    grid-template-areas: "text stop" "aside stop";
-    column-gap: var(--col-gap);
-    padding: 0 0 3rem;
-  }
-  .lane-line { left: calc(var(--read-col) + var(--col-gap)); }
-  .lane-step:first-child .lane-line { top: var(--hook); }
-  .lane-step:last-child .lane-line { bottom: auto; height: calc(var(--hook) + 2px); }
-  .lane-text { grid-area: text; display: grid; grid-template-columns: 2.25rem minmax(0, 1fr); align-content: start; }
-  .lane-text::before {
-    position: static;
-    width: auto;
-    height: auto;
-    border: 0;
-    background: none;
-    color: var(--ink-soft);
-    font: 650 1rem/1.6 var(--system);
-    text-align: left;
-  }
-  .lane-text > * { grid-column: 2; }
-  .lane-stop { grid-area: stop; margin-top: 0; padding-left: var(--hang); }
-  .lane-aside { grid-area: aside; padding-left: 2.25rem; }
+/* Each stop draws the piece of lane that reaches it from the number before, at the height of the numbers' middle. */
+.stop::after {
+  content: "";
+  position: absolute;
+  top: calc(0.35rem + 0.875rem - 1px);
+  right: 100%;
+  width: calc(100% - 1.75rem);
+  height: 2px;
+  background: var(--line);
 }
+.stop:first-child::after { content: none; }
+.stop-reached::before { border-color: var(--harbour); color: var(--harbour); }
+.stop-reached::after { background: var(--harbour); }
+.stop[aria-selected="true"] { color: var(--ink); font-weight: 650; }
+.stop[aria-selected="true"]::before { background: var(--harbour); color: var(--on-primary); }
+.steps-nav { display: flex; gap: 0.5rem; }
 
-/* A snapshot: the product's state at one step, hung from the lane by a short arm. */
+.steps-panel { margin-top: 1.75rem; }
+.step-title { margin-bottom: 0.4rem; font-size: 1.1rem; }
+.step-caption { margin: 0; font-size: 1.05rem; }
+.more summary { display: inline-flex; color: var(--harbour); font-weight: 600; }
+.more summary::after { margin-left: 0; }
+
+/* A snapshot: the product's state at one step. */
 .snap {
-  position: relative;
-  margin: 0;
   max-width: 36rem;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 0.8rem 1rem 0.95rem;
-  font-size: 0.92rem;
+  padding: 1rem 1.1rem 1.1rem;
+  font-size: 0.95rem;
   line-height: 1.5;
 }
-.snap::before,
-.snap::after { content: ""; position: absolute; background: var(--harbour); }
-.snap::before { top: var(--hook); left: calc(-1px - var(--hang)); width: var(--hang); height: 2px; }
-.snap::after { top: calc(var(--hook) - 3px); left: calc(-1px - var(--hang) - 3px); width: 8px; height: 8px; border-radius: 1px; }
-.snap-label { font-size: 0.82rem; color: var(--ink-soft); margin: 0 0 0.45rem; }
+.snap-source { margin-bottom: 0.6rem; }
 .snap p { margin: 0; max-width: none; }
-.snap .snap-title { font: 500 1.25rem/1.25 var(--catalog); }
+.snap .snap-title { font: 500 1.3rem/1.25 var(--catalog); }
 .snap .snap-sub { margin-top: 0.15rem; color: var(--ink-soft); }
 .snap .snap-state { font-weight: 600; }
-.snap .snap-note { margin-top: 0.6rem; font-size: 0.86rem; color: var(--ink-soft); }
-.snap .catalog { font-family: var(--catalog); font-size: 1.05rem; line-height: 1.45; }
-.snap .fix-text { font-size: 1.02rem; line-height: 1.6; margin: 0.2rem 0 0; }
-.snap .gate-run { border-top: 0; padding-top: 0.35rem; }
+.snap .snap-note { margin-top: 0.6rem; font-size: 0.88rem; color: var(--ink-soft); }
+.snap .lights { margin-bottom: 0.9rem; }
 .snap-fields { margin: 0.75rem 0 0; display: grid; gap: 0.55rem; }
 .snap-fields div { display: grid; gap: 0.05rem; }
 .snap-fields dt { font-size: 0.8rem; color: var(--ink-soft); }
@@ -275,7 +389,23 @@ section[id] { scroll-margin-top: 1rem; }
 .snap-endings { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
 .snap-id { font-weight: 700; }
 .snap-severity { display: block; font-size: 0.82rem; color: var(--ink-soft); }
-.snap-endings li { display: grid; grid-template-columns: 6.75rem minmax(0, 1fr); column-gap: 0.6rem; align-items: baseline; }
+.snap-endings li {
+  display: grid;
+  grid-template-columns: 6.75rem minmax(0, 1fr);
+  column-gap: 0.6rem;
+  align-items: baseline;
+}
+
+/* A fix as the review screen shows it: the words that were added and the words that were removed. */
+.fix-text { font: 400 1.05rem/1.6 var(--catalog); white-space: pre-line; margin: 0; max-width: none; }
+.fix-text ins,
+.fix-text del { color: inherit; }
+.fix-text ins {
+  background: var(--cleared-wash);
+  text-decoration: underline 1px var(--cleared);
+  text-underline-offset: 3px;
+}
+.fix-text del { background: var(--stopped-wash); text-decoration: line-through 1px var(--stopped); }
 
 /* A status as the review screen names it. The word carries the meaning; the colour repeats it. */
 .stamp {
@@ -294,76 +424,156 @@ section[id] { scroll-margin-top: 1rem; }
 .stamp-stopped { color: var(--stopped); }
 .stamp-neutral { color: var(--ink-soft); }
 
-/* The fix the demo stops on purpose, beside the twelve checks. */
-.stopped {
-  max-width: 36rem;
+/* What it looks for. Thirteen tiles; the outline says who may fix what the rule finds, and the key says it in words. */
+.rule-key {
+  list-style: none;
+  margin: 0 0 0.85rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.5rem;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+.rule-key li { display: flex; align-items: center; gap: 0.5rem; }
+.swatch { width: 1.4rem; height: 0.9rem; border-radius: 2px; }
+.rule-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+.tile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 0.55rem;
+  align-items: baseline;
+  align-content: center;
+  min-height: 2.75rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 3px;
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 1.25rem 1.25rem 1rem;
-}
-.stopped-product { font: 500 1.15rem/1.3 var(--catalog); margin-bottom: 0.4rem; }
-.stopped-lede { font-size: 0.95rem; color: var(--ink-soft); }
-.stopped-line .catalog { font: 400 1.1rem/1.5 var(--catalog); background: var(--stopped-wash); }
-.stopped .gate-caption-done { color: var(--stopped); }
-
-/* What it looks for. */
-.rule-table,
-.moves-table { width: 100%; border-collapse: collapse; line-height: 1.45; }
-.rule-table { font-size: 0.95rem; }
-.moves-table { font-size: 0.92rem; }
-.rule-table th,
-.rule-table td,
-.moves-table th,
-.moves-table td {
+  font-size: 0.93rem;
+  line-height: 1.25;
   text-align: left;
-  vertical-align: top;
-  padding: 0.6rem 0.75rem 0.6rem 0;
-  border-top: 1px solid var(--line);
+  cursor: pointer;
 }
-.rule-table thead th,
-.moves-table thead th { border-top: 0; padding-top: 0; font-size: 0.82rem; font-weight: 600; color: var(--ink-soft); }
-.rule-table tbody th { width: 3.1rem; font-weight: 700; }
-.rule-table td:last-child,
-.rule-table thead th:last-child { padding-right: 0; text-align: right; white-space: nowrap; }
-.rule-table td:last-child { color: var(--ink-soft); }
-.rule-name { display: block; font-weight: 600; }
-.rule-when { display: block; color: var(--ink-soft); }
-.table-note { margin-top: 0.85rem; font-size: 0.9rem; color: var(--ink-soft); }
+.tile-agent { border: 1px solid var(--ink-soft); border-left: 4px solid var(--harbour); }
+.tile-person { border: 1px dashed var(--ink-soft); }
+/* The dashed outline is three pixels thinner on the left, so the text of both kinds starts on one edge. */
+.tile.tile-person { padding-left: calc(0.7rem + 3px); }
+.tile-id { font-weight: 700; }
+.tile:hover { background: var(--paper); }
+.tile[aria-selected="true"] { background: var(--ink); color: var(--paper); }
+
+.rule-panel { max-width: 46rem; margin-top: 1rem; padding: 1.1rem 1.25rem 0.35rem; }
+.rule-panel p { margin: 0 0 0.75rem; max-width: none; }
+.rule-panel .severity { display: flex; align-items: center; gap: 0.5rem; font-size: 0.92rem; color: var(--ink-soft); }
+.pips { display: inline-flex; gap: 2px; }
+.pip { width: 0.7rem; height: 0.45rem; border: 1px solid var(--ink-soft); border-radius: 1px; }
+.pip-on { background: var(--ink-soft); }
+
+.checks { max-width: 46rem; margin-top: 1rem; border-block: 1px solid var(--line); }
+.checks summary { font-weight: 600; }
 .check-list { list-style: none; margin: 0 0 1rem; padding: 0; display: grid; gap: 0.35rem; font-size: 0.95rem; }
 .check-list li { display: grid; grid-template-columns: 2.75rem minmax(0, 1fr); }
-.check-id { font-weight: 700; }
-.checks-docket .docket-note,
-.moves .docket-note { margin: 0; }
 
-/* What it can never do. */
-.never-list { list-style: none; margin: 0; padding: 0; max-width: 68ch; }
-.never-list li { padding-block: 0.85rem; border-top: 1px solid var(--line); }
-.never-list li:first-child { padding-top: 0; border-top: 0; }
-.never-list strong { font-weight: 650; }
-.moves-table caption { text-align: left; font-size: 1rem; font-weight: 650; padding-bottom: 0.6rem; }
-.moves-table tbody th { font-weight: 600; white-space: nowrap; }
-.moves-table td { padding-right: 0; }
-.moves-table { margin-bottom: 0.75rem; }
+/* What it can never do. The drawing of a fix's moves, and the limits as cards that open. */
+.moves svg { display: block; width: 100%; max-width: 22rem; height: auto; overflow: visible; }
+.moves figcaption { margin-top: 0.75rem; max-width: 62ch; font-size: 0.9rem; color: var(--ink-soft); }
+.move-edge { fill: none; stroke: var(--ink-soft); stroke-width: 1.25; }
+.move-edge-on { stroke: var(--harbour); stroke-width: 2.5; }
+.move-head { fill: var(--ink-soft); }
+.move-head-on { fill: var(--harbour); }
+/* The ring below stands in for the page's focus outline, which browsers draw unevenly around parts of a drawing. */
+.move-node,
+.arch-node { cursor: pointer; outline: none; }
+.move-ring,
+.arch-ring { fill: none; stroke: none; }
+.move-node:focus-visible .move-ring,
+.arch-node:focus-visible .arch-ring { stroke: var(--harbour); stroke-width: 2; }
+.move-box { fill: var(--surface); stroke: var(--ink-soft); stroke-width: 1; }
+.move-label { fill: var(--ink); font: 600 13px var(--system); }
+/* A state the chosen one can become has a heavier outline; the chosen state itself is filled. */
+.move-node-next .move-box { stroke: var(--harbour); stroke-width: 2.5; }
+.move-node[aria-selected="true"] .move-box { fill: var(--harbour); stroke: var(--harbour); }
+.move-node[aria-selected="true"] .move-label { fill: var(--on-primary); }
 
-/* Measured, and not measured. */
-.numbers { margin: 1.5rem 0; display: grid; gap: 1.25rem; max-width: 68ch; }
-.numbers div { display: grid; gap: 0.15rem; }
-.numbers dt { font-weight: 650; }
-.numbers dd { margin: 0; }
-.numbers strong { font-weight: 650; }
-.number-failed dt, .number-failed strong { color: var(--stopped); }
-.limits { color: var(--ink-soft); }
+.limit-cards { list-style: none; margin: 0; padding: 0; display: grid; column-gap: 1.75rem; align-content: start; }
+.limit-cards li { border-top: 1px solid var(--line); }
+.limit-cards summary { font-weight: 600; }
 
-/* Inside. The diagram keeps its natural size, so its labels stay at 12px or more; a narrow screen scrolls the frame,
+/* Measured, and not measured. A meter list: every bar starts on one edge and runs on one scale, from nothing to
+   that row's whole. One hue for the bars; the stopped colour is kept for the one measure below its floor, where an
+   icon, the words and a tick at the floor say it too. Numbers and names stay in the ink colours. */
+.meters { display: block; width: 100%; max-width: 60rem; border-collapse: collapse; }
+.meters tbody { display: block; }
+.meter {
+  position: relative;
+  display: grid;
+  /* The figure's column has one width in every row, so every track is the same length and the bars share a scale. */
+  grid-template-columns: minmax(0, 1fr) 6.5rem;
+  column-gap: 1rem;
+  align-items: center;
+  padding-bottom: 0.7rem;
+  border-top: 1px solid var(--line);
+}
+.meter > th,
+.meter > td { display: block; padding: 0; font-weight: 400; text-align: left; }
+.meter > .meter-head { grid-column: 1 / -1; }
+/* The name is the button that opens the row's explanation, and the dotted line under it says there is one. A note
+   that stays on screen, such as "Lower is better", is part of the same button. */
+.meter-name {
+  display: grid;
+  align-content: center;
+  gap: 0.1rem;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.45rem 0;
+  border: 0;
+  background: none;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+}
+.meter-title {
+  justify-self: start;
+  font-weight: 600;
+  text-decoration: underline dotted var(--ink-soft);
+  text-underline-offset: 4px;
+}
+.meter-note { display: flex; align-items: center; gap: 0.35rem; font-size: 0.86rem; color: var(--ink-soft); }
+.meter-failed .meter-note { color: var(--ink); }
+.meter-failed .meter-note .icon { color: var(--stopped); }
+.meter-svg { display: block; overflow: visible; }
+.meter-track { fill: var(--line); }
+.meter-fill { fill: var(--meter); }
+.meter-failed .meter-fill { fill: var(--meter-stopped); }
+.meter-floor { stroke: var(--ink); stroke-width: 2; }
+.meter > .meter-figure { font-weight: 650; white-space: nowrap; text-align: right; }
+/* The explanation behind a row. Tapping the name opens it in place, under its row. Pointing at a row, or reaching
+   its name with the keyboard, only previews it: the preview lies over the rows below without moving them, and lets
+   the pointer through, so moving down the list reaches the next row. */
+.meter > .meter-more {
+  display: none;
+  grid-column: 1 / -1;
+  width: min(100%, 44rem);
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--ink-soft);
+  border-radius: 4px;
+  background: var(--surface);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.meter-open > .meter-more { display: block; margin-bottom: 0.7rem; }
+.meter:not(.meter-open):has(.meter-name:focus-visible) > .meter-more {
+  display: block;
+  position: absolute;
+  z-index: 2;
+  top: 100%;
+  left: 0;
+  pointer-events: none;
+}
+.numbers-notes { display: grid; gap: 0.6rem 3rem; max-width: 60rem; margin-top: 1.75rem; }
+.numbers-notes p { margin: 0; font-size: 0.97rem; color: var(--ink-soft); }
+
+/* Inside. The drawing keeps its natural size, so its labels stay at 12px or more; a narrow screen scrolls the frame,
    never the page. */
-.stack-list,
-.status-list { list-style: none; margin: 0; padding: 0; }
-.stack-list li,
-.status-list li { padding-block: 0.5rem; border-top: 1px solid var(--line); }
-.stack-list li:first-child,
-.status-list li:first-child { padding-top: 0; border-top: 0; }
-.arch { margin: 2.25rem 0 0; }
 .arch-frame {
   width: fit-content;
   max-width: 100%;
@@ -373,34 +583,120 @@ section[id] { scroll-margin-top: 1rem; }
   border-radius: 4px;
 }
 .arch-frame svg { display: block; max-width: none; }
-.arch figcaption { margin-top: 0.75rem; font-size: 0.88rem; color: var(--ink-soft); max-width: 68ch; }
-.arch-hint { display: none; }
+.arch-hint { display: none; margin-top: 0.5rem; font-size: 0.88rem; color: var(--ink-soft); }
 .arch-box { fill: var(--surface); stroke: var(--ink-soft); stroke-width: 1; }
-.arch-box-decides { stroke: var(--harbour); stroke-width: 2.5; }
+/* The heavier outline marks the two places that decide; choosing either box says so. */
+.arch-node-decides .arch-box { stroke: var(--harbour); stroke-width: 2.5; }
 .arch-edge { fill: none; stroke: var(--ink-soft); stroke-width: 1.5; }
 .arch-head { fill: var(--ink-soft); }
 .arch-title { fill: var(--ink); font: 600 14px var(--system); }
-.arch-detail,
-.arch-label { fill: var(--ink-soft); font: 400 12px var(--system); }
+.arch-detail { fill: var(--ink-soft); font: 400 12px var(--system); }
+.arch-node[aria-selected="true"] .arch-box { fill: var(--harbour); stroke: var(--harbour); }
+.arch-node[aria-selected="true"] .arch-title,
+.arch-node[aria-selected="true"] .arch-detail { fill: var(--on-primary); }
+.stack { margin-top: 1.25rem; }
+.stack .tag { padding: 0.1rem 0.55rem; font-size: 0.88rem; }
+
+/* Status and store data: short statements, and whatever a statement leaves out opens under it. */
+.closing { display: grid; column-gap: var(--col-gap); }
+.status-groups { display: grid; gap: 1.75rem 2.5rem; }
+.items { list-style: none; margin: 0; padding: 0; }
+.items li { border-top: 1px solid var(--line); }
+.items li > span { display: block; padding: 0.6rem 0; line-height: 1.4; }
+.items-marked li {
+  display: grid;
+  grid-template-columns: 1.2rem minmax(0, 1fr);
+  column-gap: 0.6rem;
+  align-items: start;
+}
+/* A link that stands by itself is as tall as a finger needs. */
+.link-row a { display: inline-flex; align-items: center; min-height: 2.75rem; }
+/* Level with the first line of the statement beside it. */
+.items-marked .icon { margin-top: 0.78rem; color: var(--ink-soft); }
+.status-done .icon { color: var(--cleared); }
 
 .colophon { padding-block: 0 3rem; font-size: 0.88rem; color: var(--ink-soft); }
 .colophon p { border-top: 1px solid var(--line); padding-top: 2rem; max-width: none; }
 
-/* Below this width the 960px diagram no longer fits beside the page margins, so the caption says it scrolls. */
+@media (hover: hover) {
+  .meter:not(.meter-open):hover > .meter-more {
+    display: block;
+    position: absolute;
+    z-index: 2;
+    top: 100%;
+    left: 0;
+    pointer-events: none;
+  }
+}
+
+@media (min-width: 640px) {
+  .limit-cards,
+  .status-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 720px) {
+  .steps-bar { grid-template-columns: minmax(0, 1fr) auto; column-gap: 2rem; align-items: start; }
+  /* The lane names its steps from this width up, so the panel need not. */
+  .step-title { display: none; }
+  .meter { grid-template-columns: minmax(0, 24rem) minmax(6rem, 1fr) 6.5rem; padding-bottom: 0; }
+  .meter > .meter-head { grid-column: 1; }
+  .numbers-notes { grid-template-columns: 3fr 2fr; }
+}
+
+@media (min-width: 1040px) {
+  .hero { grid-template-columns: minmax(0, var(--read-col)) minmax(0, 1fr); gap: var(--col-gap); padding-top: 3rem; }
+  .rule-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .split,
+  .steps-panel { grid-template-columns: minmax(0, var(--read-col)) minmax(0, 1fr); column-gap: var(--col-gap); }
+  .closing { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+}
+
+/* Below the two-column layout the page is likely under a finger, so every link in the masthead is as tall and as
+   wide as a finger needs. */
+@media (max-width: 1039px) {
+  .masthead { padding-block: 0.6rem 0; }
+  .masthead-row { row-gap: 0; }
+  .section-nav { margin-top: 0; row-gap: 0; }
+  .wordmark,
+  .masthead-link,
+  .section-nav a { display: inline-flex; align-items: center; min-width: 2.75rem; min-height: 2.75rem; }
+}
+
+@media (max-width: 719px) {
+  /* A phone has no room for seven names, so the lane shows the numbers and the panel names its step. The names stay
+     in place for screen readers. */
+  .stop-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .steps-nav .button { flex: 1; }
+}
+
+/* Below this width the 960px drawing no longer fits beside the page margins, so a line under it says it scrolls. */
 @media (max-width: 1009px) {
-  .arch-hint { display: inline; }
+  .arch-hint { display: block; }
 }
 
 @media (max-width: 560px) {
   .masthead, main, .colophon { padding-inline: 1rem; }
-  .docket { padding: 1.1rem 1rem 1rem; }
-  .gates { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 0.75rem; }
-  .snap { padding: 0.75rem 0.85rem 0.85rem; }
+  .docket { padding: 1.1rem 1rem; }
+  .snap { padding: 0.85rem 0.9rem 0.95rem; }
   .snap-endings li { display: block; }
   .snap-endings .stamp { margin-right: 0.3rem; }
-  .stopped { padding: 1rem 1rem 0.85rem; }
+  /* Two rows of six checks. The thirteen audit rules take seven to a row. */
+  .lights { grid-auto-flow: row; grid-template-columns: repeat(6, minmax(0, 1fr)); row-gap: 1rem; }
+  .lights:has(> :nth-child(13)) { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* A link back to the gate glides there, unless the visitor has asked for less movement. */
+  html { scroll-behavior: smooth; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gate-bar { transition: none; }
+  .light-bar { transition: none; }
 }
