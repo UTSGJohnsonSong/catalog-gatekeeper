@@ -1,8 +1,9 @@
 """Records what the real checks say, for the product page.
 
 The page lets a visitor add up to four unwanted lines to a fix and shows which checks stop it. Those answers are not
-written by hand: this script runs the project's validators on every combination and saves what they return. It does
-the same for the audit rules, with one example per rule from the simulated store.
+written by hand: this script asks the demo's template script for its draft, runs the project's validators on every
+combination and saves what they return. It does the same for the audit rules, with one example per rule from the
+simulated store.
 
     python scripts/build_page_samples.py            write frontend/src/landing/gate.json and rules.json
     python scripts/build_page_samples.py --check    fail if the saved files differ from what the checks say now
@@ -11,13 +12,17 @@ the same for the audit rules, with one example per rule from the simulated store
 from __future__ import annotations
 
 import argparse
+import html
 import itertools
 import json
+import re
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
 from gatekeeper.domain.product import Product, content_hash
+from gatekeeper.llm.heuristic import HeuristicProvider
 from gatekeeper.rules import spec
 from gatekeeper.rules.audit import Finding, audit_product, title_counts
 from gatekeeper.rules.text import injection_regexes, norm, strip_html
@@ -27,18 +32,13 @@ ROOT = Path(__file__).resolve().parents[1]
 STORE = ROOT / "fixtures" / "shopify" / "catalog_demo.json"
 LANDING = ROOT / "frontend" / "src" / "landing"
 
+# The simulated store marks this product so that the demo's template script adds a link to its draft, which gives the
+# demo a blocked fix to show. The page takes that draft apart: the link becomes the first switch.
 GATE_PRODUCT = "Waxed Canvas Pencil Roll"
-# The demo's template script drafts these four lines for this product.
-BASE_LINES = [
-    "Waxed Canvas Pencil Roll by Fable Canvas belongs to our stationery range.",
-    "Good stationery piece.",
-    "Choose from: Tan.",
-    "Check the product details on this page before you choose.",
-]
-# The first line is the one the demo's template is set up to add to this product, so that the demo has a blocked fix
-# to show. The other three were written for the page.
-ADDITIONS = [
-    {"id": "link", "label": "add a link", "line": "More at www.example-deals.com today."},
+LINK_LABEL = "add a link"
+# The page adds these three lines; the template never drafts them. The warranty line is also one of the eval's dev
+# phrasings.
+WRITTEN_FOR_THE_PAGE = [
     {"id": "warranty", "label": "invent a warranty", "line": "Comes with a lifetime warranty."},
     {"id": "number", "label": "make up a number", "line": "Holds 48 pencils."},
     {
@@ -53,6 +53,52 @@ def load_store() -> list[Product]:
     return [Product.from_dict(data) for data in json.loads(STORE.read_text(encoding="utf-8"))]
 
 
+def template_draft(product: Product, titles: Counter[str]) -> list[str]:
+    """The description the demo's template script proposes for a product, one line per paragraph.
+
+    The template is driven the way the agent loop drives it: it asks for the product and for its findings, then
+    proposes a fix. The answers below carry only what the template reads.
+    """
+    answers = {
+        "get_product": {
+            "fields": {
+                "title": product.title,
+                "vendor": product.vendor,
+                "product_type": product.product_type,
+                "description_text": strip_html(product.description_html),
+            },
+            "variants": [{"options": variant.get("options", [])} for variant in product.variants],
+            "metafields": product.metafields,
+        },
+        "list_findings": {
+            "findings": [{"rule_id": f.rule_id, "fixable": f.fixable} for f in audit_product(product, titles)]
+        },
+    }
+    provider = HeuristicProvider()
+    messages: list[dict[str, Any]] = []
+    for _ in range(len(answers) + 1):
+        turn = provider.create(system="", tools=[], messages=messages, max_tokens=0, effort="")
+        call = turn.blocks[0]
+        if call.name == "propose_fix":
+            changes, citations = call.input["changes"], call.input["citations"]
+            proposed = changes.get("description_html", "")
+            paragraphs = re.findall(r"<p>(.*?)</p>", proposed)
+            # The page shows this draft as plain lines of one field. If the template starts changing other fields,
+            # citing a policy or writing other markup here, the page would no longer show what it drafted.
+            if (
+                set(changes) != {"description_html"}
+                or citations
+                or "".join(f"<p>{p}</p>" for p in paragraphs) != proposed
+            ):
+                raise ValueError(f"the template's fix for {product.title} is no longer plain paragraphs alone")
+            return [html.unescape(paragraph) for paragraph in paragraphs]
+        if call.name not in answers:
+            raise ValueError(f"the template asked for {call.name}, which this script cannot answer")
+        result = {"type": "tool_result", "tool_use_id": call.id, "content": json.dumps(answers[call.name])}
+        messages += [{"role": "assistant", "content": turn.assistant_content}, {"role": "user", "content": [result]}]
+    raise ValueError("the template did not propose a fix")
+
+
 def instruction_phrase(text: str) -> str:
     """The words an injection pattern matched, so the page can show them instead of a regular expression."""
     normalized = norm(text)
@@ -60,17 +106,25 @@ def instruction_phrase(text: str) -> str:
         match = pattern.search(normalized)
         if match:
             return match.group(0).strip()
-    return ""
+    # The check can also fire on hidden characters or on text outside the visible words. The page quotes words.
+    raise ValueError("an injection check fired, but no phrase in the visible text matches to quote")
+
+
+def the_one(found: list[Any], rule_id: str) -> str:
+    """The page quotes exactly one thing per check, so more or fewer must not pass quietly."""
+    if len(found) != 1:
+        raise ValueError(f"{rule_id} found {len(found)} things where the page shows one: {found}")
+    return str(found[0])
 
 
 def what_it_found(result: ValidatorResult, proposed: str) -> str:
     evidence = result.evidence
     if result.rule_id == "V04":
-        return str(evidence["new"][0])
+        return the_one(evidence["new"], "V04")
     if result.rule_id == "V05":
-        return str(evidence["not_in_source"][0])
+        return the_one(evidence["not_in_source"], "V05")
     if result.rule_id == "V07":
-        return str(evidence["unsupported_terms"][0])
+        return the_one(evidence["unsupported_terms"], "V07")
     if result.rule_id == "V11":
         return instruction_phrase(proposed)
     raise ValueError(f"{result.rule_id} failed, and this script does not know how to show its evidence")
@@ -78,31 +132,36 @@ def what_it_found(result: ValidatorResult, proposed: str) -> str:
 
 def gate_samples(store: list[Product]) -> dict[str, Any]:
     product = next(p for p in store if p.title == GATE_PRODUCT)
+    *base_lines, link_line = template_draft(product, title_counts(store))
+    if product.metafields.get("demo.misbehave") != "link" or "www." not in link_line:
+        raise ValueError(f"the template no longer ends its draft for {GATE_PRODUCT} with a link: {link_line!r}")
+    additions = [{"id": "link", "label": LINK_LABEL, "line": link_line}, *WRITTEN_FOR_THE_PAGE]
     base_hash = content_hash(product)
     results: dict[str, Any] = {}
-    for size in range(len(ADDITIONS) + 1):
-        for chosen in itertools.combinations(ADDITIONS, size):
-            lines = BASE_LINES + [addition["line"] for addition in chosen]
-            html = "".join(f"<p>{line}</p>" for line in lines)
-            checks = run_validators(ProposalContext(product, {"description_html": html}, base_hash))
+    for size in range(len(additions) + 1):
+        for chosen in itertools.combinations(additions, size):
+            lines = base_lines + [addition["line"] for addition in chosen]
+            proposed = "".join(f"<p>{html.escape(line, quote=False)}</p>" for line in lines)
+            checks = run_validators(ProposalContext(product, {"description_html": proposed}, base_hash))
             results["+".join(addition["id"] for addition in chosen)] = {
                 "checks": [{"rule_id": c.rule_id, "passed": c.passed, "severity": c.severity} for c in checks],
                 "stopped_by": [
-                    {"rule_id": c.rule_id, "found": what_it_found(c, strip_html(html))} for c in checks if c.blocks
+                    {"rule_id": c.rule_id, "found": what_it_found(c, strip_html(proposed))} for c in checks if c.blocks
                 ],
             }
     return {
         "source": (
-            "Every combination was run through the project's validators by scripts/build_page_samples.py. "
-            "These are the answers they returned."
+            "scripts/build_page_samples.py asked the demo's template script for its draft, then ran every "
+            "combination through the project's validators. These are the answers they returned. For V11, which "
+            "reports a pattern, the script quotes the words the pattern matched."
         ),
         "product": {
             "title": product.title,
             "vendor": product.vendor,
             "before": strip_html(product.description_html),
         },
-        "base": BASE_LINES,
-        "additions": ADDITIONS,
+        "base": base_lines,
+        "additions": additions,
         "results": results,
     }
 

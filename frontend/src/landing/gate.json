@@ -1,5 +1,5 @@
 {
-  "source": "Every combination was run through the project's validators by scripts/build_page_samples.py. These are the answers they returned.",
+  "source": "scripts/build_page_samples.py asked the demo's template script for its draft, then ran every combination through the project's validators. These are the answers they returned. For V11, which reports a pattern, the script quotes the words the pattern matched.",
   "product": {
     "title": "Waxed Canvas Pencil Roll",
     "vendor": "Fable Canvas",

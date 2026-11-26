@@ -17,6 +17,7 @@ import argparse
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -81,6 +82,8 @@ def main(argv: list[str] | None = None) -> None:
     if not (args.base.startswith("/") and args.base.endswith("/")):
         parser.error("--base must start and end with /")
 
+    # The page shows answers recorded from the checks. A copy built from stale answers would publish wrong ones.
+    run(sys.executable, "scripts/build_page_samples.py", "--check")
     build(args.base, args.demo_url)
     checkout_pages_branch()
     assemble()
