@@ -77,8 +77,7 @@ export function Rules() {
           <p>Fires when {rule.when}</p>
           <SeverityMark level={rule.severity} />
           <p>
-            In the simulated store: <span className="catalog">{EXAMPLES[rule.id].product}</span>.{" "}
-            {EXAMPLES[rule.id].found}
+            In the simulated store: {EXAMPLES[rule.id].product}. {EXAMPLES[rule.id].found}
           </p>
         </div>
       ))}

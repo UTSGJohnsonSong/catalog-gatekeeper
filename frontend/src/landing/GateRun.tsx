@@ -106,7 +106,7 @@ export function Verdict({ checks, stops = [] }: { checks: Check[]; stops?: Stop[
           {stops.map((stop) => (
             <li key={stop.rule_id}>
               <span className="check-id">{stop.rule_id}</span> {CHECK_NAMES[stop.rule_id]}. It found{" "}
-              <span className="catalog">&quot;{stop.found}&quot;</span>.
+              &quot;{stop.found}&quot;.
             </li>
           ))}
         </ul>

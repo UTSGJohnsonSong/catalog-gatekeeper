@@ -76,15 +76,11 @@ export function Landing({ animate = true }: { animate?: boolean }) {
   const resetMinutes = useResetMinutes();
   return (
     <>
+      {/* In the order the bar shows them on a wide screen: the name, the sections, the demo. */}
       <header className="masthead">
-        <div className="masthead-row">
-          <a className="wordmark" href="/">
-            Catalog Gatekeeper
-          </a>
-          <a className="masthead-link" href={DEMO_URL}>
-            Open the demo
-          </a>
-        </div>
+        <a className="wordmark" href="/">
+          Catalog Gatekeeper
+        </a>
         <nav aria-label="On this page">
           <ul className="section-nav" role="list">
             {SECTIONS.map((section) => (
@@ -94,23 +90,27 @@ export function Landing({ animate = true }: { animate?: boolean }) {
             ))}
           </ul>
         </nav>
+        <a className="masthead-link" href={DEMO_URL}>
+          Open the demo
+        </a>
       </header>
 
       <main>
         <section className="hero" aria-labelledby="hero-title">
-          <div>
-            <h1 id="hero-title">An agent proposes. Twelve checks and a person decide.</h1>
-            <p className="lede">
-              Catalog Gatekeeper audits a Shopify-style catalog. A hosted LLM is meant to propose fixes; in the demo, a
-              template script drafts them. Every fix must clear deterministic checks, then a person approves the exact
-              change. It is a personal project, built on synthetic data.
-            </p>
-            <p className="actions">
-              <a className="button button-primary" href={DEMO_URL}>
-                Open the demo
-              </a>
-            </p>
-          </div>
+          {/* From tablet width up, each sentence starts a line of its own. */}
+          <h1 id="hero-title">
+            <span>An agent proposes.</span> <span>Twelve checks and a person decide.</span>
+          </h1>
+          <p className="lede">
+            Catalog Gatekeeper audits a Shopify-style catalog. A hosted LLM is meant to propose fixes; in the demo, a
+            template script drafts them. Every fix must clear deterministic checks, then a person approves the exact
+            change. It is a personal project, built on synthetic data.
+          </p>
+          <p className="actions">
+            <a className="button button-primary" href={DEMO_URL}>
+              Open the demo
+            </a>
+          </p>
           <TryGate animate={animate} />
         </section>
 
@@ -143,18 +143,17 @@ export function Landing({ animate = true }: { animate?: boolean }) {
 
         <section id="numbers" className="section" aria-labelledby="numbers-title">
           <h2 id="numbers-title">Measured, and not measured</h2>
+          {/* This sentence and the one under the meters stay on screen whatever the visitor opens: they say how far
+              the figures go. The first is read before the figures, as the section's lede. */}
+          <p className="section-lede">
+            The rules, the synthetic data and the tests share one author, so these numbers check the rules against
+            their own specification. They do not show how the rules behave on a merchant&apos;s catalog.
+          </p>
           <Meters />
-          {/* These two stay on screen whatever the visitor opens: they say how far the figures above go. */}
-          <div className="numbers-notes">
-            <p>
-              The rules, the synthetic data and the tests share one author, so these numbers check the rules against
-              their own specification. They do not show how the rules behave on a merchant&apos;s catalog.
-            </p>
-            <p>
-              Not done: the Shopify adapter has been tested only against a mock, and it has never run against a
-              merchant&apos;s store.
-            </p>
-          </div>
+          <p className="numbers-note">
+            Not done: the Shopify adapter has been tested only against a mock, and it has never run against a
+            merchant&apos;s store.
+          </p>
         </section>
 
         <section id="inside" className="section" aria-labelledby="inside-title">
@@ -169,30 +168,28 @@ export function Landing({ animate = true }: { animate?: boolean }) {
           </ul>
         </section>
 
-        <div className="closing">
-          <section id="status" className="section" aria-labelledby="status-title">
-            <h2 id="status-title">Status</h2>
-            <div className="status-groups">
-              <div className="status-done">
-                <h3>Done</h3>
-                <Items items={STATUS_DONE} icon={<CheckIcon />} />
-              </div>
-              <div>
-                <h3>Not done yet</h3>
-                <Items items={STATUS_NOT_DONE} icon={<NotYetIcon />} />
-              </div>
+        <section id="status" className="section" aria-labelledby="status-title">
+          <h2 id="status-title">Status</h2>
+          <div className="status-groups">
+            <div className="status-done">
+              <h3>Done</h3>
+              <Items items={STATUS_DONE} icon={<CheckIcon />} />
             </div>
-          </section>
+            <div>
+              <h3>Not done yet</h3>
+              <Items items={STATUS_NOT_DONE} icon={<NotYetIcon />} />
+            </div>
+          </div>
+        </section>
 
-          <section id="data" className="section" aria-labelledby="data-title">
-            <h2 id="data-title">Store data</h2>
-            <Items items={STORE_DATA} />
-            <p className="link-row">
-              {/* Relative, so it works under the API server and under a static host's base path alike. */}
-              <a href="privacy/">Read the privacy page</a>
-            </p>
-          </section>
-        </div>
+        <section id="data" className="section" aria-labelledby="data-title">
+          <h2 id="data-title">Store data</h2>
+          <Items items={STORE_DATA} />
+          <p className="link-row">
+            {/* Relative, so it works under the API server and under a static host's base path alike. */}
+            <a href="privacy/">Read the privacy page</a>
+          </p>
+        </section>
 
         <section className="section try-section" aria-labelledby="try-title">
           <h2 id="try-title">Try the review screen</h2>

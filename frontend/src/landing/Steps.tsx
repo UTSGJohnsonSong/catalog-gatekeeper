@@ -52,11 +52,11 @@ const STEPS: Step[] = [
         <dl className="snap-fields">
           <div>
             <dt>Description</dt>
-            <dd className="catalog">{passed.before.join(" ")}</dd>
+            <dd>{passed.before.join(" ")}</dd>
           </div>
           <div>
             <dt>Search description</dt>
-            <dd className="catalog">{product.seo_description}</dd>
+            <dd>{product.seo_description}</dd>
           </div>
           <div>
             <dt>Variants</dt>

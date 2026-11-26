@@ -1,27 +1,43 @@
-/* The privacy page borrows the landing page's palette, type and masthead from landing.css. Only its reading column
-   is its own: one left-aligned column of prose, the length of a legal page, set for reading rather than scanning. */
+/* The privacy page borrows the landing page's font, neutrals, type scale and masthead from landing.css. Only its
+   reading column is its own: one left-aligned column of prose on the white page, the length of a legal page, set for
+   reading rather than scanning. Its sections are headed by subheads, not by the landing page's section headlines. */
 .privacy {
-  padding-block: 2rem 4rem;
+  padding: var(--hero-top) var(--gutter) var(--section-pad);
 }
 .privacy h1 {
-  font-size: clamp(2.2rem, 4.6vw, 3.1rem);
-  margin-bottom: 1rem;
+  margin-bottom: 20px;
+}
+.privacy .lede {
+  margin-bottom: 12px;
 }
 .privacy section {
+  max-width: 40rem;
+  margin-top: 40px;
+  padding-top: 40px;
   border-top: 1px solid var(--line);
-  padding-block: 1.75rem 0.5rem;
-  max-width: 68ch;
+}
+.privacy h2 {
+  margin-bottom: 12px;
+  font-size: 24px;
+  line-height: 1.17;
+  letter-spacing: inherit;
 }
 .privacy ul {
-  margin: 0 0 1rem;
+  margin: 0 0 1em;
   padding-left: 1.25rem;
-  max-width: 66ch;
 }
 .privacy li + li {
-  margin-top: 0.35rem;
+  margin-top: 6px;
 }
 .privacy .updated {
+  margin: 0;
   color: var(--ink-soft);
-  font-size: 0.92rem;
-  margin-bottom: 2rem;
+  font-size: 14px;
+  line-height: 1.43;
+}
+
+@media (width < 734px) {
+  .privacy h2 {
+    font-size: 21px;
+  }
 }

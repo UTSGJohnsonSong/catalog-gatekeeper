@@ -53,66 +53,72 @@ export function TryGate({ animate = true }: { animate?: boolean }) {
 
   return (
     <figure className="gate" id="gate">
+      {/* Two halves: the draft, and what the visitor can try on it. On a wide screen they sit side by side; on a
+          narrower one the draft comes first. */}
       <div className="docket">
-        <div className="gate-head">
-          <p className="gate-product">{gate.product.title}</p>
-          <span className="tag">Simulated store</span>
-        </div>
+        <div className="gate-draft">
+          <div className="gate-head">
+            <p className="gate-product">{gate.product.title}</p>
+            <span className="tag">Simulated store</span>
+          </div>
 
-        {/* Every addition keeps its line whether it is chosen or not, as a blank ruled line until then, so choosing
-            one never moves the buttons under the visitor's thumb. */}
-        <ol className="gate-lines" role="list" aria-label="The proposed description">
-          {gate.base.map((line) => (
-            <li key={line} className="gate-line">
-              {line}
-            </li>
-          ))}
-          {gate.additions.map((addition) => {
-            const added = chosen.has(addition.id);
-            return (
-              <li
-                key={addition.id}
-                className={added ? "gate-line gate-line-added" : "gate-line gate-line-empty"}
-                aria-hidden={added ? undefined : true}
-              >
-                <ins>
-                  <Line text={addition.line} found={found} />
-                </ins>{" "}
-                <span className="tag">added</span>
+          {/* Every addition keeps its line whether it is chosen or not, as a blank ruled line until then, so choosing
+              one never moves the buttons under the visitor's thumb. */}
+          <ol className="gate-lines" role="list" aria-label="The proposed description">
+            {gate.base.map((line) => (
+              <li key={line} className="gate-line">
+                {line}
               </li>
-            );
-          })}
-        </ol>
-
-        <div className="gate-ask" role="group" aria-labelledby="gate-prompt">
-          <p className="gate-prompt" id="gate-prompt">
-            What if the fix also tries to...
-          </p>
-          <div className="gate-toggles">
+            ))}
             {gate.additions.map((addition) => {
-              const pressed = chosen.has(addition.id);
+              const added = chosen.has(addition.id);
               return (
-                <button
+                <li
                   key={addition.id}
-                  type="button"
-                  className="toggle"
-                  aria-pressed={pressed}
-                  onClick={() => toggle(addition.id)}
+                  className={added ? "gate-line gate-line-added" : "gate-line gate-line-empty"}
+                  aria-hidden={added ? undefined : true}
                 >
-                  {pressed ? <CheckIcon /> : <PlusIcon />}
-                  {addition.label}
-                </button>
+                  <ins>
+                    <Line text={addition.line} found={found} />
+                  </ins>{" "}
+                  <span className="tag">added</span>
+                </li>
               );
             })}
-          </div>
+          </ol>
         </div>
 
-        <div className="gate-run">
-          <Lights items={lightsOf(result.checks, shown)} />
-          {/* The page's one live region. It is filled only when a run has finished, so a screen reader hears the
-              result once and not twelve updates. */}
-          <div className="gate-verdict" role="status">
-            {done && <Verdict checks={result.checks} stops={result.stopped_by} />}
+        <div className="gate-try">
+          <div className="gate-ask" role="group" aria-labelledby="gate-prompt">
+            <p className="gate-prompt" id="gate-prompt">
+              What if the fix also tries to...
+            </p>
+            <div className="gate-toggles">
+              {gate.additions.map((addition) => {
+                const pressed = chosen.has(addition.id);
+                return (
+                  <button
+                    key={addition.id}
+                    type="button"
+                    className="toggle"
+                    aria-pressed={pressed}
+                    onClick={() => toggle(addition.id)}
+                  >
+                    {pressed ? <CheckIcon /> : <PlusIcon />}
+                    {addition.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="gate-run">
+            <Lights items={lightsOf(result.checks, shown)} />
+            {/* The page's one live region. It is filled only when a run has finished, so a screen reader hears the
+                result once and not twelve updates. */}
+            <div className="gate-verdict" role="status">
+              {done && <Verdict checks={result.checks} stops={result.stopped_by} />}
+            </div>
           </div>
         </div>
       </div>
