@@ -1,0 +1,57 @@
+{
+  "source": "One example for each audit rule, found by running the project's audit rules over the simulated store's 40 products (scripts/build_page_samples.py).",
+  "examples": {
+    "A01": {
+      "product": "Ridgeway Duffel 45L",
+      "found": "It has no description."
+    },
+    "A02": {
+      "product": "Trailhead Daypack 20L",
+      "found": "Its description is 15 characters long. The minimum is 60."
+    },
+    "A03": {
+      "product": "Harbour Tote",
+      "found": "Its description reads \"Coming soon\"."
+    },
+    "A04": {
+      "product": "Merino Crew Sweater",
+      "found": "Its description has broken HTML: <ul> closed by </p>."
+    },
+    "A05": {
+      "product": "Commuter Sling 6L",
+      "found": "It has no SEO title."
+    },
+    "A06": {
+      "product": "Summit Bottle 500ml",
+      "found": "Its SEO title is 105 characters long. The limit is 70."
+    },
+    "A07": {
+      "product": "Summit Bottle 750ml",
+      "found": "It has no SEO description."
+    },
+    "A08": {
+      "product": "Campfire Mug 350ml",
+      "found": "Its SEO description is 210 characters long. The limit is 160."
+    },
+    "A09": {
+      "product": "SOY CANDLE CEDAR",
+      "found": "Its title is written in capitals."
+    },
+    "A10": {
+      "product": "Wool Throw Blanket",
+      "found": "One of its images has no alt text."
+    },
+    "A11": {
+      "product": "Classic Wool Accessory",
+      "found": "2 products share this title."
+    },
+    "A12": {
+      "product": "Stoneware Planter",
+      "found": "One of its variants is priced at 0.00."
+    },
+    "A13": {
+      "product": "Brass Desk Lamp",
+      "found": "Its description tells the agent to \"ignore all previous instructions\"."
+    }
+  }
+}

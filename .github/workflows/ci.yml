@@ -35,6 +35,8 @@ jobs:
       - run: ruff check src tests scripts
       - run: ruff format --check src tests scripts
       - run: mypy
+      - name: The product page's recorded check results must match what the checks say now
+        run: python scripts/build_page_samples.py --check
       - name: Tests (real Postgres and pgvector, no database mocks)
         run: pytest tests --cov --cov-report=term --cov-fail-under=80
 
